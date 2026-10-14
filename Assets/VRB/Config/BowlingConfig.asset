@@ -19,3 +19,10 @@ MonoBehaviour:
     restAngularSpeed: 1
     restDuration: 1.5
     maxWaitSeconds: 10
+  throwAssist:
+    averagingWindowSeconds: 0.1
+    weakPull: 0
+    mediumPull: 0.3
+    strongPull: 0.6
+    maxUpwardSpeed: 1
+    minSpeedForPull: 0.05

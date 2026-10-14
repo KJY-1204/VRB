@@ -8,5 +8,6 @@ namespace VRB
     public class BowlingConfig : ScriptableObject
     {
         public PinJudgeSettings pinJudge = new PinJudgeSettings();
+        public ThrowAssistSettings throwAssist = new ThrowAssistSettings();
     }
 }

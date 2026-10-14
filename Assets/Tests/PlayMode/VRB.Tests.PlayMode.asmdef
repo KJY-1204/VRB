@@ -4,6 +4,7 @@
     "references": [
         "VRB.Core",
         "VRB.Runtime",
+        "Unity.XR.Interaction.Toolkit",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace VRB
@@ -10,6 +11,9 @@ namespace VRB
         Vector3 m_HomePosition;
         Quaternion m_HomeRotation;
         PitZone m_Pit;
+
+        /// <summary>Raised whenever this pin collides with something (ball, another pin, the lane).</summary>
+        public event Action<Pin, Collision> Collided;
 
         /// <summary>True while the pin's base is inside the pit volume.</summary>
         public bool InPit => m_Pit != null && m_Pit.Contains(transform.position);
@@ -32,6 +36,11 @@ namespace VRB
         {
             // Start still so pins never jitter before the first throw.
             m_Body.Sleep();
+        }
+
+        void OnCollisionEnter(Collision collision)
+        {
+            Collided?.Invoke(this, collision);
         }
 
         /// <summary>Put the pin back on its spot, upright and motionless.</summary>

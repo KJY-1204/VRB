@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using VRB;
 using VRB.Core;
 
@@ -18,6 +19,9 @@ namespace VRB.EditorTools
         const string MaterialDir = "Assets/VRB/Materials";
         const string PinPrefabPath = PrefabDir + "/Pin.prefab";
         const string BallPrefabPath = PrefabDir + "/Ball.prefab";
+        const string RollClipPath = "Assets/VRB/Bowling ball roll.wav";
+        const string HitClipPath = "Assets/VRB/Bowling pin hit.wav";
+        const string StrikeClipPath = "Assets/VRB/bowlingstrike.wav";
 
         // The FBX meshes are authored in centimeters (pin ~132 tall, ball ~72 wide) with the long axis on local Z.
         const float FbxPinHeight = 132.544f;
@@ -49,6 +53,7 @@ namespace VRB.EditorTools
         {
             EnsureFolder("Assets/VRB", "Prefabs");
             EnsureFolder("Assets/VRB", "Materials");
+            ConfigureAudioImports();
             BuildPinPrefab();
             BuildBallPrefab();
             AssetDatabase.SaveAssets();
@@ -94,6 +99,7 @@ namespace VRB.EditorTools
         {
             var ball = new GameObject("Ball");
             var body = ball.AddComponent<Rigidbody>();
+            ball.AddComponent<Ball>();
             body.mass = BowlingDimensions.BallMass;
             body.angularDamping = 0.05f;
             body.linearDamping = 0f;
@@ -109,6 +115,27 @@ namespace VRB.EditorTools
             AddVisual(ball.transform, "Bowling_ball", FbxBallDiameter, FbxBallDiameter,
                 BowlingDimensions.BallDiameter, BowlingDimensions.BallDiameter);
             ball.transform.Find("Visual").localPosition = new Vector3(0f, 0f, 0f);
+
+            var source = ball.AddComponent<AudioSource>();
+            source.spatialBlend = 1f;
+            source.minDistance = 1.5f;
+            source.maxDistance = 40f;
+            var audio = ball.AddComponent<BallAudio>();
+            var audioFields = new SerializedObject(audio);
+            audioFields.FindProperty("m_RollClip").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>(RollClipPath);
+            audioFields.ApplyModifiedPropertiesWithoutUndo();
+
+            // Grabbing: the toolkit holds the ball, but BallThrower computes the release velocity itself.
+            var grab = ball.AddComponent<XRGrabInteractable>();
+            grab.movementType = XRBaseInteractable.MovementType.Kinematic;
+            grab.throwOnDetach = false;
+            grab.useDynamicAttach = true;
+            ball.AddComponent<NearGrabFilter>();
+            var thrower = ball.AddComponent<BallThrower>();
+            var throwerFields = new SerializedObject(thrower);
+            throwerFields.FindProperty("m_Config").objectReferenceValue = GetOrCreateConfig();
+            throwerFields.ApplyModifiedPropertiesWithoutUndo();
+            ball.AddComponent<BallRespawner>();
 
             PrefabUtility.SaveAsPrefabAsset(ball, BallPrefabPath);
             Object.DestroyImmediate(ball);
@@ -240,6 +267,13 @@ namespace VRB.EditorTools
             rackConfig.FindProperty("m_Config").objectReferenceValue = GetOrCreateConfig();
             rackConfig.ApplyModifiedPropertiesWithoutUndo();
 
+            var sounds = root.AddComponent<PinSounds>();
+            var soundFields = new SerializedObject(sounds);
+            soundFields.FindProperty("m_Rack").objectReferenceValue = rack;
+            soundFields.FindProperty("m_HitClip").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>(HitClipPath);
+            soundFields.FindProperty("m_StrikeClip").objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>(StrikeClipPath);
+            soundFields.ApplyModifiedPropertiesWithoutUndo();
+
             for (var i = 0; i < PinLayout.PinCount; i++)
             {
                 var (x, z) = PinLayout.GetPosition(i);
@@ -323,6 +357,24 @@ namespace VRB.EditorTools
         {
             if (!AssetDatabase.IsValidFolder(parent + "/" + child))
                 AssetDatabase.CreateFolder(parent, child);
+        }
+
+        /// <summary>Mono, compressed audio keeps memory low on Quest; 3D sounds do not need stereo.</summary>
+        static void ConfigureAudioImports()
+        {
+            foreach (var path in new[] { RollClipPath, HitClipPath, StrikeClipPath })
+            {
+                var importer = (AudioImporter)AssetImporter.GetAtPath(path);
+                if (importer == null) continue;
+
+                importer.forceToMono = true;
+                var settings = importer.defaultSampleSettings;
+                settings.loadType = AudioClipLoadType.DecompressOnLoad;
+                settings.compressionFormat = AudioCompressionFormat.Vorbis;
+                settings.quality = 0.5f;
+                importer.defaultSampleSettings = settings;
+                importer.SaveAndReimport();
+            }
         }
 
         static BowlingConfig GetOrCreateConfig()
