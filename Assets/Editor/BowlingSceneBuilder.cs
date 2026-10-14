@@ -51,6 +51,7 @@ namespace VRB.EditorTools
             BuildUI();
             BuildGameController();
             ConfigureRig();
+            ConfigureLighting();
         }
 
         // ---------------------------------------------------------------- prefabs
@@ -489,6 +490,30 @@ namespace VRB.EditorTools
 
             game.SetActive(true);
             EditorSceneManagerUtility.MarkDirty(game.scene);
+        }
+
+        /// <summary>
+        /// Quest-friendly lighting: one directional light with no realtime shadows (the hall is enclosed, so it simply
+        /// brightens the interior) plus a flat ambient fill. The URP asset already has additional lights disabled.
+        /// </summary>
+        [MenuItem("VRB/Configure Lighting")]
+        public static void ConfigureLighting()
+        {
+            var lightObject = GameObject.Find("Directional Light");
+            if (lightObject != null)
+            {
+                var light = lightObject.GetComponent<Light>();
+                light.type = LightType.Directional;
+                light.shadows = LightShadows.None;
+                light.intensity = 1.1f;
+                light.color = new Color(1f, 0.96f, 0.90f);
+                light.transform.rotation = Quaternion.Euler(60f, -20f, 0f);
+                light.lightmapBakeType = LightmapBakeType.Realtime;
+            }
+
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = new Color(0.40f, 0.41f, 0.47f);
+            EditorSceneManagerUtility.MarkDirty(SceneManager.GetActiveScene());
         }
 
         /// <summary>The player stays at the foul line: turn off walking and teleporting so nobody wanders onto the lane.</summary>
