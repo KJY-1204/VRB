@@ -47,14 +47,31 @@ Mac에서는 코드 변경 없이 프로젝트 분석만 했고, 실기기 검�
 - Claude의 대화 메모리는 PC별이라 넘어오지 않습니다. 필요한 결정은 이 문서와 `openspec/`에 적어 두었습니다.
 - Mac에서 Android로 전환하면 `Assets/XR/Settings/OpenXRPackageSettings.asset`이 자동으로 다시 직렬화되어(`Standalone` → `Android` 이름 등) 변경으로 잡힙니다. 기능 변경이 아니므로 커밋하지 않았습니다. 집 PC에서도 비슷한 변경이 생기면 무시하거나 `git checkout`으로 되돌리세요.
 
-## 이어서 할 일 (제안 순서)
+## 이어서 할 일 (집: VR 없음 / 학교: Quest 3S 있음)
 
-1. Quest 3S용 APK를 빌드해 설치하고 위 표의 실기기 검증을 진행합니다. (검증을 더 미루려면 `/opsx:archive`로 아카이브하기 전에 위 표를 별도 파일로 옮겨 두세요.)
-2. **4.7**: 던져 보면서 `Assets/VRB/Config/BowlingConfig.asset`의 값을 조정합니다.
+집 PC에는 VR 기기가 없고 **학교에 Quest 3S가 있습니다.** 그래서 작업을 장소별로 나눕니다.
+
+### 집에서 (기기 없이 가능)
+
+1. `git pull` 후 프로젝트를 열고 Android로 전환합니다.
+2. **EditMode/PlayMode 테스트가 그대로 통과하는지** 확인합니다. (`Window > General > Test Runner`)
+3. **APK를 미리 빌드해 둡니다.** 학교에서는 설치만 하면 되도록 USB 메모리·클라우드에 복사해 가져갑니다. (학교 PC에 Unity 환경이 없을 수 있음) 학교 노트북이나 PC에 adb(또는 SideQuest/Meta Quest Developer Hub)가 있는지도 확인하세요.
+4. 기기 없이 가능한 일을 진행합니다.
+   - 단계 B(정통 점수 규칙) 설계: `/opsx:explore` → `/opsx:propose`. 단, 단계 A 검증(4.7 튜닝)에서 코어 로직이 바뀔 수 있으니 점수 규칙처럼 **독립적인 순수 C# 로직(`Assets/Scripts/Core`)** 위주로 하세요.
+   - 에디터 Play 모드 확인(XR Device Simulator 등)은 보조일 뿐 실기기 검증(아래 표)을 대체하지 못합니다. 체크박스는 채우지 마세요.
+
+### 학교에서 (Quest 3S 필요)
+
+1. 미리 빌드한 APK를 설치합니다. (학교 PC에서 Quest 개발자 모드·USB 디버깅 허용 필요. 개발자 모드는 Meta 계정/앱에서 켭니다.)
+2. 위 "실기기 검증이 남은 작업" 표를 진행하고, 끝난 항목은 `tasks.md`에 체크합니다.
+3. **4.7**: 던져 보면서 `Assets/VRB/Config/BowlingConfig.asset`의 값을 조정합니다. 값을 바꾸려면 Unity 에디터와 재빌드가 필요하니, 학교에 Unity가 없으면 **튜닝 값을 메모해 두었다가 집에서 반영**하세요.
    - `throwAssist`: `weakPull`(0), `mediumPull`(0.3), `strongPull`(0.6), `averagingWindowSeconds`(0.1), `maxUpwardSpeed`(1)
    - `pinJudge`: 쓰러짐 각도(45°), 이동 거리(0.35m), 정지 속도, 정지 유지 시간(1.5초), 최대 대기(10초)
-3. **2.4**: 프로파일링 결과 예산이 남으면 볼링장 FBX의 가벼운 장식을 추가합니다. (현재는 핀·공 메시만 사용)
-4. 검증이 끝나면 체크박스를 채우고 `/opsx:archive`로 이 change를 아카이브한 뒤, 단계 B(정통 점수 규칙) change를 새로 시작합니다.
+4. **2.4**: 프로파일링 결과 예산이 남으면 볼링장 FBX의 가벼운 장식을 추가합니다. (현재는 핀·공 메시만 사용)
+
+### 검증을 모두 마친 뒤
+
+체크박스를 채우고 `/opsx:archive`로 이 change를 아카이브한 뒤, 단계 B change를 새로 시작합니다.
 
 ## 알아 둘 설계 결정과 주의점
 
