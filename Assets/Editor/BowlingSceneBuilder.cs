@@ -1,7 +1,11 @@
 using UnityEditor;
 using UnityEngine;
+using TMPro;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 using VRB;
 using VRB.Core;
 
@@ -44,6 +48,9 @@ namespace VRB.EditorTools
             BuildEnvironment();
             BuildPins();
             BuildBallStand();
+            BuildUI();
+            BuildGameController();
+            ConfigureRig();
         }
 
         // ---------------------------------------------------------------- prefabs
@@ -306,6 +313,195 @@ namespace VRB.EditorTools
             ball.transform.position = new Vector3(0.55f, 0.8f + BowlingDimensions.BallDiameter / 2f + 0.002f, -1.2f);
 
             EditorSceneManagerUtility.MarkDirty(stand.scene);
+        }
+
+
+        // ---------------------------------------------------------------- UI and game wiring
+
+        static readonly Color PanelColor = new Color(0.05f, 0.06f, 0.10f, 0.88f);
+        static readonly Color ButtonColor = new Color(0.22f, 0.24f, 0.30f, 1f);
+
+        [MenuItem("VRB/Build UI")]
+        public static void BuildUI()
+        {
+            DestroyIfExists("SelectionCanvas");
+            DestroyIfExists("ScoreboardCanvas");
+            DestroyIfExists("EventSystem");
+
+            var eventSystem = new GameObject("EventSystem");
+            eventSystem.AddComponent<EventSystem>();
+            eventSystem.AddComponent<XRUIInputModule>();
+
+            BuildSelectionCanvas();
+            BuildScoreboardCanvas();
+            EditorSceneManagerUtility.MarkDirty(SceneManager.GetActiveScene());
+        }
+
+        static GameObject CreateWorldCanvas(string name, Vector2 size, float scale, Vector3 position)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler),
+                typeof(TrackedDeviceGraphicRaycaster));
+            var canvas = go.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            var rect = go.GetComponent<RectTransform>();
+            rect.sizeDelta = size;
+            go.transform.position = position;
+            go.transform.localScale = Vector3.one * scale;
+
+            var background = new GameObject("Background", typeof(RectTransform), typeof(Image));
+            background.transform.SetParent(go.transform, false);
+            var backgroundRect = background.GetComponent<RectTransform>();
+            backgroundRect.anchorMin = Vector2.zero;
+            backgroundRect.anchorMax = Vector2.one;
+            backgroundRect.offsetMin = Vector2.zero;
+            backgroundRect.offsetMax = Vector2.zero;
+            var image = background.GetComponent<Image>();
+            image.color = PanelColor;
+            image.raycastTarget = false;
+            return go;
+        }
+
+        static TextMeshProUGUI MakeText(Transform parent, string name, string content, float fontSize,
+            Vector2 position, Vector2 size, Color color, FontStyles style = FontStyles.Normal)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+            var text = go.GetComponent<TextMeshProUGUI>();
+            text.text = content;
+            text.fontSize = fontSize;
+            text.fontStyle = style;
+            text.color = color;
+            text.alignment = TextAlignmentOptions.Center;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        static Button MakeButton(Transform parent, string name, string label, Vector2 position, Vector2 size,
+            float fontSize)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+            go.GetComponent<Image>().color = ButtonColor;
+            var button = go.GetComponent<Button>();
+            button.targetGraphic = go.GetComponent<Image>();
+            var colors = button.colors;
+            colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+            colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+            button.colors = colors;
+
+            var text = MakeText(go.transform, "Label", label, fontSize, Vector2.zero, size, Color.white, FontStyles.Bold);
+            var textRect = text.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            return button;
+        }
+
+        static void SetReference(Object owner, string field, Object value)
+        {
+            var so = new SerializedObject(owner);
+            so.FindProperty(field).objectReferenceValue = value;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static void BuildSelectionCanvas()
+        {
+            // 1000 x 700 units at 1.5 mm per unit = 1.5 m x 1.05 m, about 2.6 m in front of the player.
+            var canvas = CreateWorldCanvas("SelectionCanvas", new Vector2(1000f, 700f), 0.0015f, new Vector3(0f, 1.55f, 1.0f));
+            var view = canvas.AddComponent<LevelSelectionView>();
+            var root = canvas.transform;
+
+            MakeText(root, "Title", "Throw Assist", 70f, new Vector2(0f, 285f), new Vector2(900f, 100f), Color.white, FontStyles.Bold);
+
+            var labels = new[] { "Raw Physics", "Weak", "Medium", "Strong" };
+            var positions = new[] { new Vector2(-230f, 130f), new Vector2(230f, 130f), new Vector2(-230f, -10f), new Vector2(230f, -10f) };
+            var buttons = new Button[4];
+            for (var i = 0; i < 4; i++)
+                buttons[i] = MakeButton(root, "Level_" + labels[i].Replace(" ", ""), labels[i], positions[i], new Vector2(420f, 110f), 50f);
+
+            var description = MakeText(root, "Description", string.Empty, 40f, new Vector2(0f, -140f), new Vector2(920f, 90f),
+                new Color(0.85f, 0.88f, 0.95f));
+            var start = MakeButton(root, "StartButton", "Start", new Vector2(0f, -270f), new Vector2(420f, 120f), 60f);
+            start.targetGraphic.color = new Color(0.20f, 0.65f, 0.35f, 1f);
+
+            var so = new SerializedObject(view);
+            var array = so.FindProperty("m_LevelButtons");
+            array.arraySize = 4;
+            for (var i = 0; i < 4; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = buttons[i];
+            so.FindProperty("m_StartButton").objectReferenceValue = start;
+            so.FindProperty("m_DescriptionText").objectReferenceValue = description;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static void BuildScoreboardCanvas()
+        {
+            // 1120 x 640 units at 2.5 mm per unit = 2.8 m x 1.6 m, hanging over the lane about 7.6 m from the player.
+            var canvas = CreateWorldCanvas("ScoreboardCanvas", new Vector2(1120f, 640f), 0.0025f, new Vector3(0f, 2.3f, 6.0f));
+            var view = canvas.AddComponent<ScoreboardView>();
+            var root = canvas.transform;
+            var grey = new Color(0.65f, 0.70f, 0.80f);
+
+            var status = MakeText(root, "Status", string.Empty, 84f, new Vector2(0f, 235f), new Vector2(1060f, 130f), Color.white, FontStyles.Bold);
+
+            var columns = new[] { "LAST", "TOTAL", "THROWS" };
+            var xs = new[] { -370f, 0f, 370f };
+            var values = new TextMeshProUGUI[3];
+            for (var i = 0; i < 3; i++)
+            {
+                MakeText(root, columns[i] + "Label", columns[i], 50f, new Vector2(xs[i], 85f), new Vector2(340f, 70f), grey);
+                values[i] = MakeText(root, columns[i] + "Value", "0", 200f, new Vector2(xs[i], -45f), new Vector2(340f, 240f), Color.white, FontStyles.Bold);
+            }
+
+            var restart = MakeButton(root, "RestartButton", "Restart", new Vector2(0f, -250f), new Vector2(380f, 100f), 56f);
+
+            var so = new SerializedObject(view);
+            so.FindProperty("m_StatusText").objectReferenceValue = status;
+            so.FindProperty("m_LastText").objectReferenceValue = values[0];
+            so.FindProperty("m_TotalText").objectReferenceValue = values[1];
+            so.FindProperty("m_ThrowsText").objectReferenceValue = values[2];
+            so.FindProperty("m_RestartButton").objectReferenceValue = restart;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        [MenuItem("VRB/Build Game Controller")]
+        public static void BuildGameController()
+        {
+            DestroyIfExists("Game");
+
+            var game = new GameObject("Game");
+            game.SetActive(false); // wire references first, then enable so Awake and OnEnable see them
+            var controller = game.AddComponent<GameController>();
+            var ball = GameObject.Find("Ball");
+
+            SetReference(controller, "m_Rack", GameObject.Find("Pins").GetComponent<PinRack>());
+            SetReference(controller, "m_Thrower", ball.GetComponent<BallThrower>());
+            SetReference(controller, "m_Respawner", ball.GetComponent<BallRespawner>());
+            SetReference(controller, "m_GrabFilter", ball.GetComponent<NearGrabFilter>());
+            SetReference(controller, "m_SelectionView", GameObject.Find("SelectionCanvas").GetComponent<LevelSelectionView>());
+            SetReference(controller, "m_Scoreboard", GameObject.Find("ScoreboardCanvas").GetComponent<ScoreboardView>());
+
+            game.SetActive(true);
+            EditorSceneManagerUtility.MarkDirty(game.scene);
+        }
+
+        /// <summary>The player stays at the foul line: turn off walking and teleporting so nobody wanders onto the lane.</summary>
+        [MenuItem("VRB/Configure Rig")]
+        public static void ConfigureRig()
+        {
+            var rig = GameObject.Find("XR Origin (XR Rig)");
+            if (rig == null) return;
+
+            rig.transform.SetPositionAndRotation(new Vector3(0f, 0f, -1.6f), Quaternion.identity);
+            var locomotion = rig.transform.Find("Locomotion");
+            if (locomotion != null) locomotion.gameObject.SetActive(false);
+            EditorSceneManagerUtility.MarkDirty(rig.scene);
         }
 
         // ---------------------------------------------------------------- helpers

@@ -7,7 +7,17 @@ namespace VRB
     [RequireComponent(typeof(Rigidbody))]
     public class Pin : MonoBehaviour
     {
+        /// <summary>Above this tilt a pin counts as lying down, where it needs rolling resistance to come to rest.</summary>
+        const float LyingTiltDegrees = 60f;
+
+        /// <summary>Lying pins slower than this get extra damping; fast tumbling pins are left alone.</summary>
+        const float DampedBelowSpeed = 2f;
+
+        [Tooltip("Angular damping while the pin lies on its side. A cone-shaped pin otherwise rolls in circles for many seconds.")]
+        [SerializeField] float m_LyingAngularDamping = 2f;
+
         Rigidbody m_Body;
+        float m_StandingAngularDamping;
         Vector3 m_HomePosition;
         Quaternion m_HomeRotation;
         PitZone m_Pit;
@@ -27,6 +37,7 @@ namespace VRB
         void Awake()
         {
             m_Body = GetComponent<Rigidbody>();
+            m_StandingAngularDamping = m_Body.angularDamping;
             m_HomePosition = transform.position;
             m_HomeRotation = transform.rotation;
             m_Pit = FindFirstObjectByType<PitZone>();
@@ -36,6 +47,14 @@ namespace VRB
         {
             // Start still so pins never jitter before the first throw.
             m_Body.Sleep();
+        }
+
+        void FixedUpdate()
+        {
+            if (m_Body.IsSleeping()) return;
+
+            var lying = TiltDegrees > LyingTiltDegrees && LinearSpeed < DampedBelowSpeed;
+            m_Body.angularDamping = lying ? m_LyingAngularDamping : m_StandingAngularDamping;
         }
 
         void OnCollisionEnter(Collision collision)

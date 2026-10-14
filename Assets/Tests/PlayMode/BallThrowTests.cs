@@ -41,6 +41,10 @@ namespace VRB.Tests
             trigger.isTrigger = true;
             trigger.radius = 0.05f;
             m_Hand = handObject.AddComponent<XRDirectInteractor>();
+
+            // Grabbing is only allowed once the game has started, so confirm the level selection first.
+            Object.FindFirstObjectByType<LevelSelectionView>().transform.Find("StartButton")
+                .GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
             yield return null;
         }
 
