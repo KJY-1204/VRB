@@ -1,0 +1,20 @@
+{
+    "name": "VRB.Runtime",
+    "rootNamespace": "VRB",
+    "references": [
+        "VRB.Core",
+        "Unity.XR.Interaction.Toolkit",
+        "Unity.InputSystem",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

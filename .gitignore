@@ -59,3 +59,7 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Android build intermediates
+/.utmp/
+/Builds/
