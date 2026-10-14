@@ -1,6 +1,7 @@
-# 인수인계 메모 (Windows → Mac)
+# 인수인계 메모 (Mac → Windows 집 PC)
 
-작성: 2026-10-14. Windows PC에서 진행하던 작업을 Mac에서 이어가기 위한 메모입니다.
+작성: 2026-10-14. 처음엔 Windows에서 Mac으로 넘어왔고, 이번에는 Mac에서 집 Windows PC로 이어가기 위한 메모입니다.
+Mac에서는 코드 변경 없이 프로젝트 분석만 했고, 실기기 검증은 하지 못했습니다. 상태는 아래와 같습니다.
 현재 변경(change)은 `openspec/changes/bowling-core-loop`(단계 A: 코어 플레이 루프)입니다.
 
 ## 한눈에 보는 상태
@@ -27,27 +28,28 @@
 | 5.4 | 정위치에서 전광판 글자가 선명하게 읽힘 |
 | 6.1 | 선택 → 던지기 → 판정 → 표시 → 리셋 → 재시작을 10회 이상 반복 |
 
-## Mac에서 시작하기
+## Windows(집 PC)에서 시작하기
 
-1. 저장소를 클론합니다: `git clone https://github.com/KJY-1204/VRB.git`
+1. 저장소를 클론하거나 기존 폴더에서 `git pull`을 합니다: `git clone https://github.com/KJY-1204/VRB.git`
 2. Unity Hub에서 **Unity `6000.3.24f1`** 을 설치합니다. 모듈은 **Android Build Support**(OpenJDK, Android SDK & NDK Tools 포함)를 선택합니다.
-3. 프로젝트를 엽니다. `Library/`는 저장소에 없으므로 **첫 임포트에 시간이 걸립니다.**
-4. 이 프로젝트는 Windows에서 Android 타깃으로 전환해 두었지만, 그 설정(`UserSettings/`, `Library/`)은 저장소에 없으므로 Mac에서 **`File > Build Profiles`에서 Android로 한 번 전환**해야 합니다.
+3. 프로젝트를 엽니다. `Library/`는 저장소에 없으므로 클론했다면 **첫 임포트에 시간이 걸립니다.**
+4. `File > Build Profiles`에서 **Android로 전환**합니다. (`UserSettings/`, `Library/`는 저장소에 없습니다.)
 5. 열린 씬은 `Assets/Scenes/VRB.unity`입니다. 빌드 씬 목록에도 이것만 들어 있습니다.
-6. APK 설치용 adb는 Unity에 포함돼 있습니다.
-   `/Applications/Unity/Hub/Editor/6000.3.24f1/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb install -r <APK 경로>`
+6. APK 설치용 adb는 Unity에 포함돼 있습니다. 경로 예시(설치 위치에 맞게 수정):
+   `"C:\Program Files\Unity\Hub\Editor\6000.3.24f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe" install -r <APK 경로>`
    Quest는 개발자 모드를 켜고 USB로 연결합니다.
 
-### Mac에서 달라지는 점
+### 환경 관련 참고
 
-- `.vsconfig`는 Windows의 Visual Studio용 설정이라 Mac에서는 무시해도 됩니다. Rider나 VS Code를 쓰세요.
+- Windows에서는 `.vsconfig`를 Visual Studio 설치 구성에 쓸 수 있습니다.
 - 줄바꿈은 `.gitattributes`로 LF로 통일돼 있어 별도 설정이 필요 없습니다.
-- **OpenSpec CLI(`openspec`)와 Unity MCP(`unity-editor-mcp`)는 저장소에 포함되지 않은 PC별 도구입니다.** 이어서 `/opsx:*` 명령이나 에디터 자동화를 쓰려면 Mac에도 설치·연결해야 합니다. `.claude/commands`와 `.claude/skills`는 저장소에 있습니다.
+- **OpenSpec CLI(`openspec`)와 Unity MCP(`unity-editor-mcp`)는 저장소에 포함되지 않은 PC별 도구입니다.** `/opsx:*` 명령이나 에디터 자동화를 쓰려면 집 PC에서 확인하세요. `.claude/commands`와 `.claude/skills`는 저장소에 있습니다.
 - Claude의 대화 메모리는 PC별이라 넘어오지 않습니다. 필요한 결정은 이 문서와 `openspec/`에 적어 두었습니다.
+- Mac에서 Android로 전환하면 `Assets/XR/Settings/OpenXRPackageSettings.asset`이 자동으로 다시 직렬화되어(`Standalone` → `Android` 이름 등) 변경으로 잡힙니다. 기능 변경이 아니므로 커밋하지 않았습니다. 집 PC에서도 비슷한 변경이 생기면 무시하거나 `git checkout`으로 되돌리세요.
 
 ## 이어서 할 일 (제안 순서)
 
-1. Quest 3S용 APK를 빌드해 설치하고 위 표의 실기기 검증을 진행합니다.
+1. Quest 3S용 APK를 빌드해 설치하고 위 표의 실기기 검증을 진행합니다. (검증을 더 미루려면 `/opsx:archive`로 아카이브하기 전에 위 표를 별도 파일로 옮겨 두세요.)
 2. **4.7**: 던져 보면서 `Assets/VRB/Config/BowlingConfig.asset`의 값을 조정합니다.
    - `throwAssist`: `weakPull`(0), `mediumPull`(0.3), `strongPull`(0.6), `averagingWindowSeconds`(0.1), `maxUpwardSpeed`(1)
    - `pinJudge`: 쓰러짐 각도(45°), 이동 거리(0.35m), 정지 속도, 정지 유지 시간(1.5초), 최대 대기(10초)
