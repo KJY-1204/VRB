@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using TMPro;
@@ -53,6 +54,7 @@ namespace VRB.EditorTools
             BuildUI();
             BuildGameController();
             ConfigureRig();
+            BuildSeat();
             ConfigureLighting();
         }
 
@@ -581,6 +583,30 @@ namespace VRB.EditorTools
             var locomotion = rig.transform.Find("Locomotion");
             if (locomotion != null) locomotion.gameObject.SetActive(false);
             EditorSceneManagerUtility.MarkDirty(rig.scene);
+        }
+
+        /// <summary>
+        /// Makes the hall's chair closest to the lane (the FBX's Object010, between its table and the lane)
+        /// something the player can sit on. The FBX has no colliders, so a box is added for the ray to hit.
+        /// </summary>
+        [MenuItem("VRB/Build Seat")]
+        public static void BuildSeat()
+        {
+            DestroyIfExists("Seat");
+            var rig = GameObject.Find("XR Origin (XR Rig)");
+            var chair = GameObject.Find("Hall")?.GetComponentsInChildren<Renderer>()
+                .FirstOrDefault(r => r.name == "Object010");
+            if (rig == null || chair == null) return;
+
+            var seat = new GameObject("Seat");
+            seat.transform.position = new Vector3(chair.bounds.center.x, 0.25f, chair.bounds.center.z);
+            seat.AddComponent<BoxCollider>().size = new Vector3(0.7f, 0.5f, 0.7f);
+            var spot = seat.AddComponent<SeatSpot>();
+            var fields = new SerializedObject(spot);
+            fields.FindProperty("m_Rig").objectReferenceValue = rig.transform;
+            fields.FindProperty("m_Head").objectReferenceValue = rig.GetComponentInChildren<Camera>();
+            fields.ApplyModifiedPropertiesWithoutUndo();
+            EditorSceneManagerUtility.MarkDirty(seat.scene);
         }
 
         // ---------------------------------------------------------------- helpers
