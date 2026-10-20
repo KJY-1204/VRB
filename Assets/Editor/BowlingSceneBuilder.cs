@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using TMPro;
@@ -23,6 +24,7 @@ namespace VRB.EditorTools
         const string MaterialDir = "Assets/VRB/Materials";
         const string PinPrefabPath = PrefabDir + "/Pin.prefab";
         const string BallPrefabPath = PrefabDir + "/Ball.prefab";
+        const string HallPrefabPath = PrefabDir + "/BowlingHall.prefab";
         const string RollClipPath = "Assets/VRB/Bowling ball roll.wav";
         const string HitClipPath = "Assets/VRB/Bowling pin hit.wav";
         const string StrikeClipPath = "Assets/VRB/bowlingstrike.wav";
@@ -257,8 +259,62 @@ namespace VRB.EditorTools
             foulBox.isTrigger = true;
             foulBox.size = new Vector3(HallHalfWidth * 2f, 3f, 2f);
 
+            BuildHallVisual(root);
+
             MarkStaticRecursively(root);
             EditorSceneManagerUtility.MarkDirty(root.scene);
+        }
+
+        /// <summary>
+        /// Strips the bowling club FBX of its heavy decoration (a 222k-triangle ceiling panel, teapot lamps,
+        /// light strips, loose balls and pins) and saves what is left as a prefab (about 27k triangles).
+        /// </summary>
+        static void BuildHallPrefab()
+        {
+            var fbx = AssetDatabase.LoadAssetAtPath<GameObject>(BowlingClubFbx);
+            var hall = (GameObject)PrefabUtility.InstantiatePrefab(fbx);
+            PrefabUtility.UnpackPrefabInstance(hall, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+            hall.name = "BowlingHall";
+
+            var removed = new List<GameObject>();
+            foreach (var t in hall.GetComponentsInChildren<Transform>(true))
+            {
+                if (t == hall.transform) continue;
+                var n = t.name;
+                if (n.StartsWith("Bowling_") || n.StartsWith("Teapot") || n.StartsWith("Object0")
+                    || n.StartsWith("Line0") || n == "Cylinder003" || n == "Cone001")
+                    removed.Add(t.gameObject);
+            }
+            foreach (var go in removed) Object.DestroyImmediate(go);
+
+            PrefabUtility.SaveAsPrefabAsset(hall, HallPrefabPath);
+            Object.DestroyImmediate(hall);
+        }
+
+        /// <summary>
+        /// Places the decorated hall around the physics lane. The FBX lanes run along its +X in meters, so the hall
+        /// is turned onto +Z and shifted so that the 4th lane's foul line and center land on this lane's. The FBX pin
+        /// deck ends 18.4m past the foul line, the pins need 19.2m, so the hall is stretched along the lane to fit.
+        /// The hand-built boxes stay as colliders; only their renderers are hidden.
+        /// </summary>
+        static void BuildHallVisual(GameObject lane)
+        {
+            BuildHallPrefab();
+
+            const float fbxFoulLineX = -15.06f;
+            const float fbxLaneCenterZ = -17.0f;
+            const float fbxPinDeckEndX = 3.32f;
+            var stretch = (LaneEndZ + 0.15f) / (fbxPinDeckEndX - fbxFoulLineX);
+
+            foreach (var r in lane.GetComponentsInChildren<MeshRenderer>())
+                if (r.name != "Ceiling") r.enabled = false;
+
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(HallPrefabPath);
+            var hall = (GameObject)PrefabUtility.InstantiatePrefab(prefab, lane.transform);
+            hall.name = "Hall";
+            hall.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
+            hall.transform.localScale = new Vector3(stretch, 1f, 1f);
+            hall.transform.localPosition = new Vector3(fbxLaneCenterZ, 0f, -fbxFoulLineX * stretch);
         }
 
         // ---------------------------------------------------------------- pins and ball stand
