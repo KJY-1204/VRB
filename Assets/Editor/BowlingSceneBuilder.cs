@@ -265,9 +265,13 @@ namespace VRB.EditorTools
             EditorSceneManagerUtility.MarkDirty(root.scene);
         }
 
+        const float FbxFoulLineX = -15.06f;
+        const float FbxLaneCenterZ = -17.0f;
+        const float FbxPinDeckEndX = 3.32f;
+
         /// <summary>
-        /// Strips the bowling club FBX of its heavy decoration (a 222k-triangle ceiling panel, teapot lamps,
-        /// light strips, loose balls and pins) and saves what is left as a prefab (about 27k triangles).
+        /// Saves the bowling club FBX as a prefab with all of its decoration. Only the loose pins and balls standing
+        /// on the lane we play on are removed, because the game brings its own physical ones.
         /// </summary>
         static void BuildHallPrefab()
         {
@@ -277,13 +281,10 @@ namespace VRB.EditorTools
             hall.name = "BowlingHall";
 
             var removed = new List<GameObject>();
-            foreach (var t in hall.GetComponentsInChildren<Transform>(true))
+            foreach (var r in hall.GetComponentsInChildren<Renderer>(true))
             {
-                if (t == hall.transform) continue;
-                var n = t.name;
-                if (n.StartsWith("Bowling_") || n.StartsWith("Teapot") || n.StartsWith("Object0")
-                    || n.StartsWith("Line0") || n == "Cylinder003" || n == "Cone001")
-                    removed.Add(t.gameObject);
+                if (!r.name.StartsWith("Bowling_pin") && !r.name.StartsWith("Bowling_ball")) continue;
+                if (Mathf.Abs(r.bounds.center.z - FbxLaneCenterZ) < 0.9f) removed.Add(r.gameObject);
             }
             foreach (var go in removed) Object.DestroyImmediate(go);
 
@@ -301,10 +302,7 @@ namespace VRB.EditorTools
         {
             BuildHallPrefab();
 
-            const float fbxFoulLineX = -15.06f;
-            const float fbxLaneCenterZ = -17.0f;
-            const float fbxPinDeckEndX = 3.32f;
-            var stretch = (LaneEndZ + 0.15f) / (fbxPinDeckEndX - fbxFoulLineX);
+            var stretch = (LaneEndZ + 0.15f) / (FbxPinDeckEndX - FbxFoulLineX);
 
             foreach (var r in lane.GetComponentsInChildren<MeshRenderer>())
                 if (r.name != "Ceiling") r.enabled = false;
@@ -314,7 +312,7 @@ namespace VRB.EditorTools
             hall.name = "Hall";
             hall.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
             hall.transform.localScale = new Vector3(stretch, 1f, 1f);
-            hall.transform.localPosition = new Vector3(fbxLaneCenterZ, 0f, -fbxFoulLineX * stretch);
+            hall.transform.localPosition = new Vector3(FbxLaneCenterZ, 0f, -FbxFoulLineX * stretch);
         }
 
         // ---------------------------------------------------------------- pins and ball stand
