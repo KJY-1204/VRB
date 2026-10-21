@@ -14,13 +14,20 @@ namespace VRB.Core
     }
 
     /// <summary>
-    /// Turn flow of one game: select level, then repeat ready -> throw -> settle -> show result -> reset, until the
-    /// tenth frame is done and the game is over. Pure logic; the scene drives it by reporting what happened (ball
-    /// released, pins settled, ...).
+    /// Turn flow of one match: select level and the number of players, then repeat ready -> throw -> settle -> show
+    /// result -> reset, with the players taking turns, until everyone's tenth frame is done and the game is over. Pure
+    /// logic; the scene drives it by reporting what happened (ball released, pins settled, ...).
     /// </summary>
     public sealed class GameFlow
     {
-        public GameSession Session { get; }
+        public Match Match { get; private set; }
+
+        /// <summary>The player whose turn it is. During the result of a throw it is still the one who threw.</summary>
+        public Player CurrentPlayer => Match.Current;
+
+        /// <summary>The current player's game; with a single player, simply the game.</summary>
+        public GameSession Session => Match.Current.Session;
+
         public GamePhase Phase { get; private set; } = GamePhase.SelectingLevel;
         public ThrowAssistLevel SelectedLevel { get; private set; } = ThrowAssist.Default;
         public int LastPinsFallen { get; private set; }
@@ -28,11 +35,21 @@ namespace VRB.Core
         /// <summary>Raised on every phase change with (previous, current).</summary>
         public event Action<GamePhase, GamePhase> PhaseChanged;
 
-        public GameFlow() : this(new GameSession()) { }
+        /// <summary>Raised when the turn passes to another player, with (previous, current).</summary>
+        public event Action<Player, Player> TurnChanged;
 
-        public GameFlow(GameSession session)
+        public GameFlow() : this(new Match()) { }
+
+        public GameFlow(Match match)
         {
-            Session = session ?? throw new ArgumentNullException(nameof(session));
+            Match = match ?? throw new ArgumentNullException(nameof(match));
+        }
+
+        /// <summary>Set how many people play. Only allowed before the game starts; every scorecard starts empty.</summary>
+        public void SetPlayerCount(int playerCount)
+        {
+            Require(GamePhase.SelectingLevel, nameof(SetPlayerCount));
+            Match = new Match(playerCount);
         }
 
         /// <summary>True only while the player may grab and throw a ball.</summary>
@@ -70,25 +87,31 @@ namespace VRB.Core
         public void PinsSettled(int pinsFallen)
         {
             Require(GamePhase.Settling, nameof(PinsSettled));
-            Session.RecordThrow(pinsFallen);
+            Match.RecordThrow(pinsFallen);
             LastPinsFallen = pinsFallen;
             SetPhase(GamePhase.ShowingResult);
         }
 
         /// <summary>
-        /// True when the pins about to be reset should all be set up again (a new frame, or a fresh rack in the tenth);
-        /// false when the standing ones stay and only the fallen are cleared (second ball of a frame).
+        /// True when the pins about to be reset should all be set up again (a new frame for whoever is up next, or a
+        /// fresh rack in the tenth); false when the standing ones stay and only the fallen are cleared (second ball of
+        /// a frame). Read it after <see cref="ResultShown"/>, which is when the turn moves on.
         /// </summary>
         public bool NeedsFreshRack => Session.PinsStanding == GameSession.PinCount;
 
         /// <summary>
-        /// The result has been on screen long enough. Goes on to reset pins and ball, or, if that was the last throw of
-        /// the game, to the game-over screen.
+        /// The result has been on screen long enough. The turn passes to the next player if the thrower's frame is
+        /// over; then it goes on to reset pins and ball, or, if that was the last throw of the match, to the game-over
+        /// screen.
         /// </summary>
         public void ResultShown()
         {
             Require(GamePhase.ShowingResult, nameof(ResultShown));
-            SetPhase(Session.IsComplete ? GamePhase.GameOver : GamePhase.Resetting);
+
+            var previous = Match.Current;
+            if (Match.AdvanceTurn()) TurnChanged?.Invoke(previous, Match.Current);
+
+            SetPhase(Match.IsComplete ? GamePhase.GameOver : GamePhase.Resetting);
         }
 
         /// <summary>Pins and ball are back in place; the next throw may start.</summary>
@@ -101,7 +124,7 @@ namespace VRB.Core
         /// <summary>Clear the record and go back to level selection from any phase.</summary>
         public void Restart()
         {
-            Session.Reset();
+            Match.Reset();
             LastPinsFallen = 0;
             SelectedLevel = ThrowAssist.Default;
             SetPhase(GamePhase.SelectingLevel);
