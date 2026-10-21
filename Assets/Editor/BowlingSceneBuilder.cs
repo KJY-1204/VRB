@@ -538,9 +538,6 @@ namespace VRB.EditorTools
 
         // ---------------------------------------------------------------- UI and game wiring
 
-        static readonly Color PanelColor = new Color(0.05f, 0.06f, 0.10f, 0.88f);
-        static readonly Color ButtonColor = new Color(0.22f, 0.24f, 0.30f, 1f);
-
         [MenuItem("VRB/Build UI")]
         public static void BuildUI()
         {
@@ -559,6 +556,31 @@ namespace VRB.EditorTools
             EditorSceneManagerUtility.MarkDirty(SceneManager.GetActiveScene());
         }
 
+        /// <summary>The built-in rounded-rectangle sprite; sliced, so the corners keep their size at any rectangle size.</summary>
+        static Sprite RoundedSprite => AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+
+        static Image MakeCard(Transform parent, string name, Color color, Vector2 position, Vector2 size, float radius = 28f)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
+            var image = go.GetComponent<Image>();
+            RoundCorners(image, radius);
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        static void RoundCorners(Image image, float radius)
+        {
+            var sprite = RoundedSprite;
+            image.sprite = sprite;
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = sprite.border.x / radius;
+        }
+
         static GameObject CreateWorldCanvas(string name, Vector2 size, float scale, Vector3 position)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler),
@@ -570,21 +592,16 @@ namespace VRB.EditorTools
             go.transform.position = position;
             go.transform.localScale = Vector3.one * scale;
 
-            var background = new GameObject("Background", typeof(RectTransform), typeof(Image));
-            background.transform.SetParent(go.transform, false);
-            var backgroundRect = background.GetComponent<RectTransform>();
-            backgroundRect.anchorMin = Vector2.zero;
-            backgroundRect.anchorMax = Vector2.one;
-            backgroundRect.offsetMin = Vector2.zero;
-            backgroundRect.offsetMax = Vector2.zero;
-            var image = background.GetComponent<Image>();
-            image.color = PanelColor;
-            image.raycastTarget = false;
+            // A thin neon edge around a deep navy panel.
+            MakeCard(go.transform, "Edge", new Color(UiPalette.Accent.r, UiPalette.Accent.g, UiPalette.Accent.b, 0.9f),
+                Vector2.zero, size + new Vector2(10f, 10f), 40f);
+            MakeCard(go.transform, "Background", new Color(UiPalette.Panel.r, UiPalette.Panel.g, UiPalette.Panel.b, 1f),
+                Vector2.zero, size, 36f);
             return go;
         }
 
         static TextMeshProUGUI MakeText(Transform parent, string name, string content, float fontSize,
-            Vector2 position, Vector2 size, Color color, FontStyles style = FontStyles.Normal)
+            Vector2 position, Vector2 size, Color color, FontStyles style = FontStyles.Normal, float spacing = 0f)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
@@ -596,6 +613,7 @@ namespace VRB.EditorTools
             text.fontSize = fontSize;
             text.fontStyle = style;
             text.color = color;
+            text.characterSpacing = spacing;
             text.alignment = TextAlignmentOptions.Center;
             text.raycastTarget = false;
             return text;
@@ -604,20 +622,25 @@ namespace VRB.EditorTools
         static Button MakeButton(Transform parent, string name, string label, Vector2 position, Vector2 size,
             float fontSize)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button), typeof(Outline));
             go.transform.SetParent(parent, false);
             var rect = go.GetComponent<RectTransform>();
             rect.anchoredPosition = position;
             rect.sizeDelta = size;
-            go.GetComponent<Image>().color = ButtonColor;
+            var image = go.GetComponent<Image>();
+            RoundCorners(image, Mathf.Min(size.y * 0.4f, 36f));
+            image.color = UiPalette.Button;
+            var outline = go.GetComponent<Outline>();
+            outline.effectColor = new Color(UiPalette.Accent.r, UiPalette.Accent.g, UiPalette.Accent.b, 0.55f);
+            outline.effectDistance = new Vector2(3f, -3f);
             var button = go.GetComponent<Button>();
-            button.targetGraphic = go.GetComponent<Image>();
+            button.targetGraphic = image;
             var colors = button.colors;
-            colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
-            colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+            colors.highlightedColor = new Color(1.25f, 1.25f, 1.25f, 1f);
+            colors.pressedColor = new Color(0.75f, 0.75f, 0.75f, 1f);
             button.colors = colors;
 
-            var text = MakeText(go.transform, "Label", label, fontSize, Vector2.zero, size, Color.white, FontStyles.Bold);
+            var text = MakeText(go.transform, "Label", label, fontSize, Vector2.zero, size, Color.white, FontStyles.Bold, 2f);
             var textRect = text.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
@@ -640,24 +663,27 @@ namespace VRB.EditorTools
             var view = canvas.AddComponent<LevelSelectionView>();
             var root = canvas.transform;
 
-            MakeText(root, "Title", "Throw Assist", 70f, new Vector2(0f, 345f), new Vector2(900f, 100f), Color.white, FontStyles.Bold);
+            MakeText(root, "Title", "VR BOWLING", 84f, new Vector2(0f, 340f), new Vector2(900f, 110f), Color.white, FontStyles.Bold, 12f);
+            MakeCard(root, "TitleBar", UiPalette.Accent, new Vector2(0f, 283f), new Vector2(260f, 8f), 4f);
 
             var laneButtons = new Button[FbxLaneCentersZ.Length];
-            MakeText(root, "LaneLabel", "Lane", 44f, new Vector2(-420f, 235f), new Vector2(140f, 70f), new Color(0.65f, 0.70f, 0.80f));
+            MakeText(root, "LaneLabel", "LANE", 38f, new Vector2(-395f, 205f), new Vector2(170f, 60f), UiPalette.Muted, FontStyles.Bold, 6f);
             for (var i = 0; i < laneButtons.Length; i++)
                 laneButtons[i] = MakeButton(root, "Lane_" + (i + 1), (i + 1).ToString(),
-                    new Vector2(-200f + i * 200f, 235f), new Vector2(170f, 90f), 50f);
+                    new Vector2(-190f + i * 190f, 205f), new Vector2(160f, 90f), 52f);
 
+            MakeText(root, "LevelLabel", "THROW ASSIST", 38f, new Vector2(0f, 120f), new Vector2(700f, 60f), UiPalette.Muted, FontStyles.Bold, 6f);
             var labels = new[] { "Raw Physics", "Weak", "Medium", "Strong" };
-            var positions = new[] { new Vector2(-230f, 95f), new Vector2(230f, 95f), new Vector2(-230f, -45f), new Vector2(230f, -45f) };
+            var positions = new[] { new Vector2(-230f, 35f), new Vector2(230f, 35f), new Vector2(-230f, -95f), new Vector2(230f, -95f) };
             var buttons = new Button[4];
             for (var i = 0; i < 4; i++)
-                buttons[i] = MakeButton(root, "Level_" + labels[i].Replace(" ", ""), labels[i], positions[i], new Vector2(420f, 110f), 50f);
+                buttons[i] = MakeButton(root, "Level_" + labels[i].Replace(" ", ""), labels[i], positions[i], new Vector2(420f, 108f), 48f);
 
-            var description = MakeText(root, "Description", string.Empty, 40f, new Vector2(0f, -175f), new Vector2(920f, 90f),
-                new Color(0.85f, 0.88f, 0.95f));
-            var start = MakeButton(root, "StartButton", "Start", new Vector2(0f, -305f), new Vector2(420f, 120f), 60f);
-            start.targetGraphic.color = new Color(0.20f, 0.65f, 0.35f, 1f);
+            var description = MakeText(root, "Description", string.Empty, 38f, new Vector2(0f, -215f), new Vector2(920f, 80f),
+                UiPalette.Muted);
+            var start = MakeButton(root, "StartButton", "START", new Vector2(0f, -325f), new Vector2(460f, 120f), 62f);
+            start.targetGraphic.color = UiPalette.Go;
+            start.GetComponent<Outline>().effectColor = new Color(0.55f, 1f, 0.75f, 0.7f);
 
             var so = new SerializedObject(view);
             var array = so.FindProperty("m_LevelButtons");
@@ -673,29 +699,36 @@ namespace VRB.EditorTools
 
         static void BuildScoreboardCanvas()
         {
-            // 1120 x 640 units at 0.9 mm per unit = 1.0 m x 0.58 m, about 1 m to the player's left, inside the hall's left
-            // wall (1.12 m from the lane center). Turn the head left to read it. Picking another lane slides the hall
-            // to the left, so the wall is only ever farther from it.
-            var position = new Vector3(-1.0f, 1.3f, -1.4f);
+            // 1120 x 640 units at 0.9 mm per unit = 1.0 m x 0.58 m, about 0.85 m to the player's left, hung just off the
+            // hall's left wall, whose face is 0.96 m from the lane center at this height. Turn the head left to read it.
+            // It is only turned 8 degrees toward the player: turning it fully would swing one end into the wall. Picking
+            // another lane slides the hall to the left, so the wall is only ever farther from it. Low enough not to overlap
+            // the mirror screen above.
+            var position = new Vector3(-0.84f, 1.15f, -0.9f);
             var canvas = CreateWorldCanvas("ScoreboardCanvas", new Vector2(1120f, 640f), 0.0009f, position);
-            var playerHead = new Vector3(0f, 1.4f, -1.6f);
-            canvas.transform.rotation = Quaternion.LookRotation(new Vector3(position.x - playerHead.x, 0f, position.z - playerHead.z));
+            canvas.transform.rotation = Quaternion.Euler(0f, 270f + 8f, 0f);
             var view = canvas.AddComponent<ScoreboardView>();
             var root = canvas.transform;
-            var grey = new Color(0.65f, 0.70f, 0.80f);
 
-            var status = MakeText(root, "Status", string.Empty, 84f, new Vector2(0f, 235f), new Vector2(1060f, 130f), Color.white, FontStyles.Bold);
+            MakeCard(root, "StatusPill", UiPalette.Card, new Vector2(0f, 235f), new Vector2(900f, 130f), 60f);
+            var status = MakeText(root, "Status", string.Empty, 76f, new Vector2(0f, 235f), new Vector2(860f, 120f),
+                UiPalette.Amber, FontStyles.Bold, 2f);
 
             var columns = new[] { "LAST", "TOTAL", "THROWS" };
-            var xs = new[] { -370f, 0f, 370f };
+            var xs = new[] { -365f, 0f, 365f };
             var values = new TextMeshProUGUI[3];
             for (var i = 0; i < 3; i++)
             {
-                MakeText(root, columns[i] + "Label", columns[i], 50f, new Vector2(xs[i], 85f), new Vector2(340f, 70f), grey);
-                values[i] = MakeText(root, columns[i] + "Value", "0", 200f, new Vector2(xs[i], -45f), new Vector2(340f, 240f), Color.white, FontStyles.Bold);
+                var total = i == 1;
+                var card = MakeCard(root, columns[i] + "Card", UiPalette.Card, new Vector2(xs[i], -5f), new Vector2(330f, 290f), 44f);
+                if (total) card.color = new Color(0.08f, 0.22f, 0.40f, 1f);
+                MakeText(root, columns[i] + "Label", columns[i], 44f, new Vector2(xs[i], 105f), new Vector2(320f, 60f),
+                    total ? UiPalette.Accent : UiPalette.Muted, FontStyles.Bold, 8f);
+                values[i] = MakeText(root, columns[i] + "Value", "0", total ? 230f : 190f, new Vector2(xs[i], -25f), new Vector2(320f, 240f),
+                    Color.white, FontStyles.Bold);
             }
 
-            var restart = MakeButton(root, "RestartButton", "Restart", new Vector2(0f, -250f), new Vector2(380f, 100f), 56f);
+            var restart = MakeButton(root, "RestartButton", "RESTART", new Vector2(0f, -245f), new Vector2(380f, 96f), 50f);
 
             var so = new SerializedObject(view);
             so.FindProperty("m_StatusText").objectReferenceValue = status;
@@ -717,11 +750,12 @@ namespace VRB.EditorTools
             var view = canvas.AddComponent<TvScoreView>();
             var root = canvas.transform;
 
+            MakeCard(root, "StatusPill", UiPalette.Card, new Vector2(0f, -235f), new Vector2(840f, 120f), 56f);
             MakeText(root, "TotalLabel", "TOTAL", 70f, new Vector2(0f, 235f), new Vector2(800f, 90f),
-                new Color(0.65f, 0.70f, 0.80f));
+                UiPalette.Accent, FontStyles.Bold, 14f);
             var total = MakeText(root, "Total", "0", 380f, new Vector2(0f, 10f), new Vector2(800f, 400f), Color.white, FontStyles.Bold);
-            var status = MakeText(root, "Status", string.Empty, 84f, new Vector2(0f, -235f), new Vector2(880f, 110f),
-                new Color(1f, 0.85f, 0.35f), FontStyles.Bold);
+            var status = MakeText(root, "Status", string.Empty, 80f, new Vector2(0f, -235f), new Vector2(820f, 110f),
+                UiPalette.Amber, FontStyles.Bold, 2f);
             Object.DestroyImmediate(canvas.GetComponent<TrackedDeviceGraphicRaycaster>()); // display only
 
             var so = new SerializedObject(view);

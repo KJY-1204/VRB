@@ -32,6 +32,7 @@ namespace VRB
         public void Refresh(GamePhase phase, GameSession session, int lastPins)
         {
             m_StatusText.text = StatusFor(phase, lastPins);
+            m_StatusText.color = UiPalette.StatusColor(phase, lastPins);
             m_LastText.text = session.ThrowCount == 0 ? "-" : lastPins.ToString();
             m_TotalText.text = session.TotalPins.ToString();
             m_ThrowsText.text = session.ThrowCount.ToString();

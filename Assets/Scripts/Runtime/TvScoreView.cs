@@ -19,6 +19,7 @@ namespace VRB
             m_StatusText.text = phase == GamePhase.SelectingLevel
                 ? "Choose a level"
                 : ScoreboardView.StatusFor(phase, lastPins);
+            m_StatusText.color = UiPalette.StatusColor(phase, lastPins);
         }
     }
 }

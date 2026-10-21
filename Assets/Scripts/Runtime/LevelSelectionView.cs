@@ -9,8 +9,8 @@ namespace VRB
     /// <summary>Pre-game screen: pick one of the four throw correction levels, then start.</summary>
     public class LevelSelectionView : MonoBehaviour
     {
-        static readonly Color SelectedColor = new Color(0.20f, 0.65f, 0.35f, 1f);
-        static readonly Color NormalColor = new Color(0.22f, 0.24f, 0.30f, 1f);
+        static readonly Color SelectedColor = UiPalette.Selected;
+        static readonly Color NormalColor = UiPalette.Button;
 
         [SerializeField] Button[] m_LevelButtons = new Button[4];   // index = (int)ThrowAssistLevel
         [SerializeField] Button[] m_LaneButtons = new Button[0];    // index = lane, 0-based
