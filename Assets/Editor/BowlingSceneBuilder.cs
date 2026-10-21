@@ -26,6 +26,7 @@ namespace VRB.EditorTools
         const string PinPrefabPath = PrefabDir + "/Pin.prefab";
         const string BallPrefabPath = PrefabDir + "/Ball.prefab";
         const string HallPrefabPath = PrefabDir + "/BowlingHall.prefab";
+        const string HallMeshPath = PrefabDir + "/BowlingHallPlane.asset";
         const string RollClipPath = "Assets/VRB/Bowling ball roll.wav";
         const string HitClipPath = "Assets/VRB/Bowling pin hit.wav";
         const string StrikeClipPath = "Assets/VRB/bowlingstrike.wav";
@@ -293,8 +294,120 @@ namespace VRB.EditorTools
             }
             foreach (var go in removed) Object.DestroyImmediate(go);
 
+            OpenMaskingUnits(hall);
+
             PrefabUtility.SaveAsPrefabAsset(hall, HallPrefabPath);
             Object.DestroyImmediate(hall);
+        }
+
+        // The hall's four lanes, as the z of each lane's center in the FBX. Only the second one has its masking unit
+        // raised and pins standing behind it; the other three are shut.
+        static readonly float[] FbxLaneCentersZ = { -17.0f, -18.8f, -20.55f, -22.35f };
+        const int FbxOpenLane = 1;
+        const float FbxPinDeckStartX = 2.4f;
+        const float FbxLaneHalfSpan = 0.9f;
+
+        /// <summary>
+        /// Gives the other lanes the same open masking unit as the second one. The lanes are baked into one mesh, so
+        /// the pin-deck end of that lane (everything fully inside its span past the deck start) is copied over the
+        /// same part of the other lanes. The loose pins standing in the open one are duplicated too, except on the
+        /// lane we play on, which has the game's own pins.
+        /// </summary>
+        static void OpenMaskingUnits(GameObject hall)
+        {
+            var plane = hall.transform.Find("Plane001");
+            var filter = plane.GetComponent<MeshFilter>();
+            var source = filter.sharedMesh;
+            var vertices = new List<Vector3>(source.vertices);
+            var normals = new List<Vector3>(source.normals);
+            var uvs = new List<Vector2>(source.uv);
+            var targets = new List<int>();
+            for (var lane = 0; lane < FbxLaneCentersZ.Length; lane++)
+                if (lane != FbxOpenLane) targets.Add(lane);
+
+            bool InSpan(int[] indices, int first, float centerZ)
+            {
+                var minX = float.MaxValue;
+                var minZ = float.MaxValue;
+                var maxZ = float.MinValue;
+                for (var k = 0; k < 3; k++)
+                {
+                    var p = hall.transform.InverseTransformPoint(plane.TransformPoint(vertices[indices[first + k]]));
+                    minX = Mathf.Min(minX, p.x);
+                    minZ = Mathf.Min(minZ, p.z);
+                    maxZ = Mathf.Max(maxZ, p.z);
+                }
+                return minX >= FbxPinDeckStartX && minZ >= centerZ - FbxLaneHalfSpan && maxZ <= centerZ + FbxLaneHalfSpan;
+            }
+
+            var submeshes = new List<int[]>();
+            var sourceVertexCount = vertices.Count;
+            for (var s = 0; s < source.subMeshCount; s++)
+            {
+                var indices = source.GetIndices(s);
+                var result = new List<int>();
+                for (var t = 0; t < indices.Length; t += 3)
+                {
+                    var replaced = false;
+                    foreach (var lane in targets)
+                        if (InSpan(indices, t, FbxLaneCentersZ[lane])) replaced = true;
+                    if (replaced) continue;
+                    result.Add(indices[t]);
+                    result.Add(indices[t + 1]);
+                    result.Add(indices[t + 2]);
+                }
+
+                foreach (var lane in targets)
+                {
+                    var shift = plane.InverseTransformVector(
+                        hall.transform.TransformVector(new Vector3(0f, 0f, FbxLaneCentersZ[lane] - FbxLaneCentersZ[FbxOpenLane])));
+                    var copies = new Dictionary<int, int>();
+                    for (var t = 0; t < indices.Length; t += 3)
+                    {
+                        if (!InSpan(indices, t, FbxLaneCentersZ[FbxOpenLane])) continue;
+                        for (var k = 0; k < 3; k++)
+                        {
+                            var original = indices[t + k];
+                            if (!copies.TryGetValue(original, out var copy))
+                            {
+                                copy = vertices.Count;
+                                vertices.Add(vertices[original] + shift);
+                                normals.Add(normals[original]);
+                                uvs.Add(uvs[original]);
+                                copies[original] = copy;
+                            }
+                            result.Add(copy);
+                        }
+                    }
+                }
+                submeshes.Add(result.ToArray());
+            }
+
+            var mesh = new Mesh { name = source.name + "_open", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            mesh.SetVertices(vertices);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(0, uvs);
+            mesh.subMeshCount = submeshes.Count;
+            for (var s = 0; s < submeshes.Count; s++) mesh.SetIndices(submeshes[s], MeshTopology.Triangles, s);
+            mesh.RecalculateBounds();
+            AssetDatabase.DeleteAsset(HallMeshPath);
+            AssetDatabase.CreateAsset(mesh, HallMeshPath);
+            filter.sharedMesh = mesh;
+
+            var openZ = FbxLaneCentersZ[FbxOpenLane];
+            var pins = new List<Renderer>();
+            foreach (var r in hall.GetComponentsInChildren<Renderer>())
+                if (r.name.StartsWith("Bowling_pin") && Mathf.Abs(r.bounds.center.z - openZ) < FbxLaneHalfSpan) pins.Add(r);
+            foreach (var lane in targets)
+            {
+                if (Mathf.Abs(FbxLaneCentersZ[lane] - FbxLaneCenterZ) < 0.1f) continue; // our lane has real pins
+                foreach (var pin in pins)
+                {
+                    var copy = Object.Instantiate(pin.gameObject, pin.transform.parent);
+                    copy.name = pin.name + "_lane" + (lane + 1);
+                    copy.transform.position = pin.transform.position + new Vector3(0f, 0f, FbxLaneCentersZ[lane] - openZ);
+                }
+            }
         }
 
         /// <summary>
