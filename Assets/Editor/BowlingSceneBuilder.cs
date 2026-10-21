@@ -673,8 +673,13 @@ namespace VRB.EditorTools
 
         static void BuildScoreboardCanvas()
         {
-            // 1120 x 640 units at 2.5 mm per unit = 2.8 m x 1.6 m, hanging over the lane about 7.6 m from the player.
-            var canvas = CreateWorldCanvas("ScoreboardCanvas", new Vector2(1120f, 640f), 0.0025f, new Vector3(0f, 2.3f, 6.0f));
+            // 1120 x 640 units at 0.9 mm per unit = 1.0 m x 0.58 m, about 1 m to the player's left, inside the hall's left
+            // wall (1.12 m from the lane center). Turn the head left to read it. Picking another lane slides the hall
+            // to the left, so the wall is only ever farther from it.
+            var position = new Vector3(-1.0f, 1.3f, -1.4f);
+            var canvas = CreateWorldCanvas("ScoreboardCanvas", new Vector2(1120f, 640f), 0.0009f, position);
+            var playerHead = new Vector3(0f, 1.4f, -1.6f);
+            canvas.transform.rotation = Quaternion.LookRotation(new Vector3(position.x - playerHead.x, 0f, position.z - playerHead.z));
             var view = canvas.AddComponent<ScoreboardView>();
             var root = canvas.transform;
             var grey = new Color(0.65f, 0.70f, 0.80f);
