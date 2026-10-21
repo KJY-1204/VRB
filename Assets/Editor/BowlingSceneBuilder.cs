@@ -541,6 +541,7 @@ namespace VRB.EditorTools
         [MenuItem("VRB/Build UI")]
         public static void BuildUI()
         {
+            EnsureUiSprites();
             DestroyIfExists("SelectionCanvas");
             DestroyIfExists("ScoreboardCanvas");
             DestroyIfExists("TvCanvas");
@@ -556,8 +557,57 @@ namespace VRB.EditorTools
             EditorSceneManagerUtility.MarkDirty(SceneManager.GetActiveScene());
         }
 
-        /// <summary>The built-in rounded-rectangle sprite; sliced, so the corners keep their size at any rectangle size.</summary>
-        static Sprite RoundedSprite => AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        const string UiDir = "Assets/VRB/UI";
+        const string UiFillPath = UiDir + "/RoundedFill.png";
+        const string UiRingPath = UiDir + "/RoundedRing.png";
+        const int UiSpriteSize = 96;
+        const float UiSpriteRadius = 36f;
+        const float UiSpriteBorder = 40f;
+
+        /// <summary>
+        /// Writes the two 9-slice sprites every panel is made of: a filled rounded rectangle and a thin rounded outline.
+        /// They are generated rather than imported, so the look can be tuned here, and the outline can stay hollow, which
+        /// the see-through panels need (a solid edge behind them would tint the whole panel).
+        /// </summary>
+        static void EnsureUiSprites()
+        {
+            EnsureFolder("Assets/VRB", "UI");
+            WriteRoundedSprite(UiFillPath, 0f);
+            WriteRoundedSprite(UiRingPath, 4f);
+        }
+
+        static void WriteRoundedSprite(string path, float ringThickness)
+        {
+            var texture = new Texture2D(UiSpriteSize, UiSpriteSize, TextureFormat.RGBA32, false);
+            var half = UiSpriteSize / 2f;
+            var inner = new Vector2(half - UiSpriteRadius, half - UiSpriteRadius);
+            for (var y = 0; y < UiSpriteSize; y++)
+            {
+                for (var x = 0; x < UiSpriteSize; x++)
+                {
+                    var q = new Vector2(Mathf.Abs(x + 0.5f - half), Mathf.Abs(y + 0.5f - half)) - inner;
+                    var distance = Vector2.Max(q, Vector2.zero).magnitude + Mathf.Min(Mathf.Max(q.x, q.y), 0f) - UiSpriteRadius;
+                    var alpha = Mathf.Clamp01(0.5f - distance);
+                    if (ringThickness > 0f) alpha *= Mathf.Clamp01(distance + ringThickness + 0.5f);
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
+            System.IO.File.WriteAllBytes(path, texture.EncodeToPNG());
+            Object.DestroyImmediate(texture);
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spriteBorder = new Vector4(UiSpriteBorder, UiSpriteBorder, UiSpriteBorder, UiSpriteBorder);
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = false;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.SaveAndReimport();
+        }
 
         static Image MakeCard(Transform parent, string name, Color color, Vector2 position, Vector2 size, float radius = 28f)
         {
@@ -573,12 +623,19 @@ namespace VRB.EditorTools
             return image;
         }
 
+        /// <summary>A thin outline that follows the rounded corners of a rectangle of the given size.</summary>
+        static Image MakeRing(Transform parent, string name, Color color, Vector2 size, float radius)
+        {
+            var ring = MakeCard(parent, name, color, Vector2.zero, size, radius);
+            ring.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(UiRingPath);
+            return ring;
+        }
+
         static void RoundCorners(Image image, float radius)
         {
-            var sprite = RoundedSprite;
-            image.sprite = sprite;
+            image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(UiFillPath);
             image.type = Image.Type.Sliced;
-            image.pixelsPerUnitMultiplier = sprite.border.x / radius;
+            image.pixelsPerUnitMultiplier = UiSpriteRadius / radius;
         }
 
         static GameObject CreateWorldCanvas(string name, Vector2 size, float scale, Vector3 position)
@@ -592,11 +649,9 @@ namespace VRB.EditorTools
             go.transform.position = position;
             go.transform.localScale = Vector3.one * scale;
 
-            // A thin neon edge around a deep navy panel.
-            MakeCard(go.transform, "Edge", new Color(UiPalette.Accent.r, UiPalette.Accent.g, UiPalette.Accent.b, 0.9f),
-                Vector2.zero, size + new Vector2(10f, 10f), 40f);
-            MakeCard(go.transform, "Background", new Color(UiPalette.Panel.r, UiPalette.Panel.g, UiPalette.Panel.b, 1f),
-                Vector2.zero, size, 36f);
+            // A see-through navy panel with a thin neon edge.
+            MakeCard(go.transform, "Background", UiPalette.Panel, Vector2.zero, size, 36f);
+            MakeRing(go.transform, "Edge", UiPalette.Edge, size, 36f);
             return go;
         }
 
@@ -622,7 +677,7 @@ namespace VRB.EditorTools
         static Button MakeButton(Transform parent, string name, string label, Vector2 position, Vector2 size,
             float fontSize)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button), typeof(Outline));
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
             var rect = go.GetComponent<RectTransform>();
             rect.anchoredPosition = position;
@@ -630,9 +685,8 @@ namespace VRB.EditorTools
             var image = go.GetComponent<Image>();
             RoundCorners(image, Mathf.Min(size.y * 0.4f, 36f));
             image.color = UiPalette.Button;
-            var outline = go.GetComponent<Outline>();
-            outline.effectColor = new Color(UiPalette.Accent.r, UiPalette.Accent.g, UiPalette.Accent.b, 0.55f);
-            outline.effectDistance = new Vector2(3f, -3f);
+            var radius = Mathf.Min(size.y * 0.4f, 36f);
+            MakeRing(go.transform, "Ring", new Color(UiPalette.Edge.r, UiPalette.Edge.g, UiPalette.Edge.b, 0.7f), size, radius);
             var button = go.GetComponent<Button>();
             button.targetGraphic = image;
             var colors = button.colors;
@@ -683,7 +737,7 @@ namespace VRB.EditorTools
                 UiPalette.Muted);
             var start = MakeButton(root, "StartButton", "START", new Vector2(0f, -325f), new Vector2(460f, 120f), 62f);
             start.targetGraphic.color = UiPalette.Go;
-            start.GetComponent<Outline>().effectColor = new Color(0.55f, 1f, 0.75f, 0.7f);
+            start.transform.Find("Ring").GetComponent<Image>().color = new Color(0.55f, 1f, 0.75f, 0.9f);
 
             var so = new SerializedObject(view);
             var array = so.FindProperty("m_LevelButtons");
@@ -721,7 +775,7 @@ namespace VRB.EditorTools
             {
                 var total = i == 1;
                 var card = MakeCard(root, columns[i] + "Card", UiPalette.Card, new Vector2(xs[i], -5f), new Vector2(330f, 290f), 44f);
-                if (total) card.color = new Color(0.08f, 0.22f, 0.40f, 1f);
+                if (total) card.color = UiPalette.CardHighlight;
                 MakeText(root, columns[i] + "Label", columns[i], 44f, new Vector2(xs[i], 105f), new Vector2(320f, 60f),
                     total ? UiPalette.Accent : UiPalette.Muted, FontStyles.Bold, 8f);
                 values[i] = MakeText(root, columns[i] + "Value", "0", total ? 230f : 190f, new Vector2(xs[i], -25f), new Vector2(320f, 240f),
