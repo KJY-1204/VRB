@@ -153,6 +153,33 @@ namespace VRB.Tests
         }
 
         [UnityTest]
+        public IEnumerator APictureOfTheLane_ReachesTheOtherDevice_ButNotTheSender()
+        {
+            yield return HostAndJoin();
+            var clientPlayer = PlayerOn(m_Client, m_Client.LocalClientId);
+            var onHost = PlayerOn(m_Host, m_Client.LocalClientId);
+
+            var picture = new LaneSnapshot { ActiveMask = LaneSnapshot.AllActive & ~(1u << 2) };
+            for (var i = 0; i < LaneSnapshot.BodyCount; i++)
+            {
+                picture.Positions[i] = new Vector3(0.1f * i, 0.2f, 5f);
+                picture.Rotations[i] = Quaternion.identity;
+            }
+
+            // Unreliable, so send a few times, as the broadcaster does.
+            for (var attempt = 0; attempt < 20 && onHost.SnapshotTime < 0f; attempt++)
+            {
+                clientPlayer.SendSnapshot(picture);
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            Assert.That(onHost.SnapshotTime, Is.GreaterThanOrEqualTo(0f), "The picture should arrive.");
+            Assert.That(onHost.Snapshot.Positions[4].x, Is.EqualTo(0.4f).Within(0.001f));
+            Assert.That(onHost.Snapshot.IsActive(2), Is.False);
+            Assert.That(clientPlayer.SnapshotTime, Is.LessThan(0f), "The sender does not get its own picture back.");
+        }
+
+        [UnityTest]
         public IEnumerator ANewGame_EmptiesTheThrowsOnTheOtherDevice()
         {
             yield return HostAndJoin();

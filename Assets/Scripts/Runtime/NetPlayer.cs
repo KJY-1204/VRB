@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Netcode;
+using UnityEngine;
 using VRB.Core;
 
 namespace VRB
@@ -23,6 +24,9 @@ namespace VRB
 
         /// <summary>Raised when the player object that belongs to this device exists and is ready to use.</summary>
         public static event Action<NetPlayer> LocalReady;
+
+        /// <summary>Raised when a new picture of another player's lane has arrived.</summary>
+        public static event Action<NetPlayer> SnapshotReceived;
 
         readonly NetworkVariable<FixedString32Bytes> m_Name = new NetworkVariable<FixedString32Bytes>(
             default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
@@ -47,6 +51,32 @@ namespace VRB
         }
 
         public bool IsLocalPlayer => IsOwner;
+
+        /// <summary>The player object of this device, or null when not in a network game.</summary>
+        public static NetPlayer Local => All.FirstOrDefault(p => p != null && p.IsSpawned && p.IsLocalPlayer);
+
+        /// <summary>The latest picture of this player's lane (pins and ball), as received from their device.</summary>
+        public LaneSnapshot Snapshot { get; } = new LaneSnapshot();
+
+        /// <summary>When (<see cref="Time.time"/>) the last picture arrived; negative before the first.</summary>
+        public float SnapshotTime { get; private set; } = -1f;
+
+        /// <summary>Tell the other devices where the pins and the ball are on this player's lane (the owner only).</summary>
+        public void SendSnapshot(LaneSnapshot snapshot)
+        {
+            if (!IsOwner || !IsSpawned) return;
+            SnapshotRpc(snapshot.Positions, snapshot.Rotations, snapshot.ActiveMask);
+        }
+
+        // A lost picture does not matter, the next one is only a moment away, so these go unreliably (and cheaply).
+        [Rpc(SendTo.NotOwner, Delivery = RpcDelivery.Unreliable)]
+        void SnapshotRpc(Vector3[] positions, Quaternion[] rotations, uint activeMask)
+        {
+            if (!Snapshot.TrySet(positions, rotations, activeMask)) return;
+
+            SnapshotTime = Time.time;
+            SnapshotReceived?.Invoke(this);
+        }
 
         void Awake()
         {

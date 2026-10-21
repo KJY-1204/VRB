@@ -19,8 +19,28 @@ namespace VRB
 
         public event Action<int> LaneChanged;
 
+        readonly System.Collections.Generic.HashSet<int> m_RemoteLanes = new System.Collections.Generic.HashSet<int>();
+
         public int Selected { get; private set; }
         public int LaneCount => m_LaneOffsets.Length;
+
+        /// <summary>Sideways distance (meters, +X) of a lane from the first lane of the hall.</summary>
+        public float OffsetOf(int lane) => m_LaneOffsets[Mathf.Clamp(lane, 0, LaneCount - 1)];
+
+        /// <summary>
+        /// Where a lane is relative to the lane being played, which is always at x = 0 (the hall slides, the game does not).
+        /// </summary>
+        public float SidewaysFromPlayed(int lane) => OffsetOf(lane) - OffsetOf(Selected);
+
+        /// <summary>
+        /// Marks a lane as one another player is bowling on, drawn live by <see cref="RemoteLanes"/>; its still decoration
+        /// pins are hidden meanwhile.
+        /// </summary>
+        public void SetRemote(int lane, bool remote)
+        {
+            var changed = remote ? m_RemoteLanes.Add(lane) : m_RemoteLanes.Remove(lane);
+            if (changed) ApplyDecorations();
+        }
 
         void Awake()
         {
@@ -45,11 +65,17 @@ namespace VRB
 
             m_Hall.localPosition = m_BasePosition - new Vector3(m_LaneOffsets[Selected], 0f, 0f);
 
-            for (var i = 0; i < m_DecorPins.Length; i++)
-                if (m_DecorPins[i] != null) m_DecorPins[i].SetActive(i != Selected);
+            ApplyDecorations();
 
             for (var i = 0; i < m_Seats.Length; i++)
                 if (m_Seats[i] != null) m_Seats[i].gameObject.SetActive(i == Selected);
+        }
+
+        // The lane being played has the game's own pins, and lanes with another player have theirs drawn live.
+        void ApplyDecorations()
+        {
+            for (var i = 0; i < m_DecorPins.Length; i++)
+                if (m_DecorPins[i] != null) m_DecorPins[i].SetActive(i != Selected && !m_RemoteLanes.Contains(i));
         }
     }
 }

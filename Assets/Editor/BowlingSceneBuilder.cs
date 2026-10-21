@@ -1210,10 +1210,64 @@ namespace VRB.EditorTools
             bridgeFields.ApplyModifiedPropertiesWithoutUndo();
 
             BuildNetworkMenu(session, selection);
+            BuildRemoteLanes(lane, bridge.transform);
 
             // Sockets need the internet permission on the headset, even for a game on the local network.
             PlayerSettings.Android.forceInternetPermission = true;
             EditorSceneManagerUtility.MarkDirty(root.scene);
+        }
+
+        /// <summary>
+        /// Stand-in pins and a ball for each of the hall's lanes (looks only, no physics) that show another player's lane
+        /// live, plus the broadcaster that reports this device's own lane to the others.
+        /// </summary>
+        static void BuildRemoteLanes(LaneSelector lanes, Transform bridge)
+        {
+            DestroyIfExists("RemoteLanes");
+            var pinVisual = AssetDatabase.LoadAssetAtPath<GameObject>(PinPrefabPath).transform.Find("Visual").gameObject;
+            var ballVisual = AssetDatabase.LoadAssetAtPath<GameObject>(BallPrefabPath).transform.Find("Visual").gameObject;
+
+            var root = new GameObject("RemoteLanes");
+            var remoteLanes = new RemoteLane[lanes.LaneCount];
+            for (var i = 0; i < remoteLanes.Length; i++)
+            {
+                var laneObject = new GameObject("RemoteLane_" + (i + 1));
+                laneObject.transform.SetParent(root.transform, false);
+                var remote = laneObject.AddComponent<RemoteLane>();
+
+                var bodies = new Transform[LaneSnapshot.BodyCount];
+                for (var b = 0; b < bodies.Length; b++)
+                {
+                    var holder = new GameObject(b < LaneSnapshot.PinCount ? "Pin_" + b : "Ball").transform;
+                    holder.SetParent(laneObject.transform, false);
+                    var visual = Object.Instantiate(b < LaneSnapshot.PinCount ? pinVisual : ballVisual, holder);
+                    visual.name = "Visual";
+                    bodies[b] = holder;
+                }
+
+                var fields = new SerializedObject(remote);
+                var array = fields.FindProperty("m_Bodies");
+                array.arraySize = bodies.Length;
+                for (var b = 0; b < bodies.Length; b++) array.GetArrayElementAtIndex(b).objectReferenceValue = bodies[b];
+                fields.ApplyModifiedPropertiesWithoutUndo();
+
+                remoteLanes[i] = remote;
+                laneObject.SetActive(false);
+            }
+
+            var view = root.AddComponent<RemoteLanes>();
+            var viewFields = new SerializedObject(view);
+            viewFields.FindProperty("m_Lanes").objectReferenceValue = lanes;
+            var lanesArray = viewFields.FindProperty("m_RemoteLanes");
+            lanesArray.arraySize = remoteLanes.Length;
+            for (var i = 0; i < remoteLanes.Length; i++) lanesArray.GetArrayElementAtIndex(i).objectReferenceValue = remoteLanes[i];
+            viewFields.ApplyModifiedPropertiesWithoutUndo();
+
+            var broadcaster = bridge.gameObject.AddComponent<LaneBroadcaster>();
+            var broadcasterFields = new SerializedObject(broadcaster);
+            broadcasterFields.FindProperty("m_Rack").objectReferenceValue = GameObject.Find("Pins").GetComponent<PinRack>();
+            broadcasterFields.FindProperty("m_Ball").objectReferenceValue = GameObject.Find("Ball").transform;
+            broadcasterFields.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>
