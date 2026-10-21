@@ -13,13 +13,16 @@ namespace VRB
         static readonly Color NormalColor = new Color(0.22f, 0.24f, 0.30f, 1f);
 
         [SerializeField] Button[] m_LevelButtons = new Button[4];   // index = (int)ThrowAssistLevel
+        [SerializeField] Button[] m_LaneButtons = new Button[0];    // index = lane, 0-based
         [SerializeField] Button m_StartButton;
         [SerializeField] TMP_Text m_DescriptionText;
 
         public event Action<ThrowAssistLevel> LevelPicked;
+        public event Action<int> LanePicked;
         public event Action StartPressed;
 
         public ThrowAssistLevel Selected { get; private set; } = ThrowAssist.Default;
+        public int SelectedLane { get; private set; }
         public string DescriptionText => m_DescriptionText != null ? m_DescriptionText.text : string.Empty;
 
         void Awake()
@@ -30,8 +33,28 @@ namespace VRB
                 m_LevelButtons[i].onClick.AddListener(() => Pick(level));
             }
 
+            for (var i = 0; i < m_LaneButtons.Length; i++)
+            {
+                var lane = i;
+                m_LaneButtons[i].onClick.AddListener(() => PickLane(lane));
+            }
+
             m_StartButton.onClick.AddListener(() => StartPressed?.Invoke());
             Refresh();
+        }
+
+        /// <summary>Called by the player pressing a lane button.</summary>
+        public void PickLane(int lane)
+        {
+            SelectedLane = lane;
+            Refresh();
+            LanePicked?.Invoke(lane);
+        }
+
+        public bool IsLaneHighlighted(int lane)
+        {
+            var image = m_LaneButtons[lane].targetGraphic as Image;
+            return image != null && image.color == SelectedColor;
         }
 
         /// <summary>Called by the player pressing a level button.</summary>
@@ -63,6 +86,12 @@ namespace VRB
             {
                 if (m_LevelButtons[i].targetGraphic is Image image)
                     image.color = i == (int)Selected ? SelectedColor : NormalColor;
+            }
+
+            for (var i = 0; i < m_LaneButtons.Length; i++)
+            {
+                if (m_LaneButtons[i].targetGraphic is Image image)
+                    image.color = i == SelectedLane ? SelectedColor : NormalColor;
             }
 
             if (m_DescriptionText != null) m_DescriptionText.text = Describe(Selected);

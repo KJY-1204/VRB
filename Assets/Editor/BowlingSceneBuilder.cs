@@ -313,8 +313,8 @@ namespace VRB.EditorTools
         /// <summary>
         /// Gives the other lanes the same open masking unit as the second one. The lanes are baked into one mesh, so
         /// the pin-deck end of that lane (everything fully inside its span past the deck start) is copied over the
-        /// same part of the other lanes. The loose pins standing in the open one are duplicated too, except on the
-        /// lane we play on, which has the game's own pins.
+        /// same part of the other lanes. The loose pins standing in the open one are duplicated to every lane, one group
+        /// per lane: <see cref="LaneSelector"/> hides the group on the lane being played, which has the game's own pins.
         /// </summary>
         static void OpenMaskingUnits(GameObject hall)
         {
@@ -414,12 +414,21 @@ namespace VRB.EditorTools
             var pins = new List<Renderer>();
             foreach (var r in hall.GetComponentsInChildren<Renderer>())
                 if (r.name.StartsWith("Bowling_pin") && Mathf.Abs(r.bounds.center.z - openZ) < FbxLaneHalfSpan) pins.Add(r);
-            foreach (var lane in targets)
+            // One group of decorative pins per lane, so the one under the game's own pins can be hidden.
+            for (var lane = 0; lane < FbxLaneCentersZ.Length; lane++)
             {
-                if (Mathf.Abs(FbxLaneCentersZ[lane] - FbxLaneCenterZ) < 0.1f) continue; // our lane has real pins
+                var group = new GameObject("FbxPins_Lane" + (lane + 1));
+                group.transform.SetParent(hall.transform, false);
                 foreach (var pin in pins)
                 {
+                    if (lane == FbxOpenLane)
+                    {
+                        pin.transform.SetParent(group.transform, true);
+                        continue;
+                    }
+
                     var copy = Object.Instantiate(pin.gameObject, pin.transform.parent);
+                    copy.transform.SetParent(group.transform, true);
                     copy.name = pin.name + "_lane" + (lane + 1);
                     copy.transform.position = pin.transform.position + new Vector3(0f, 0f, FbxLaneCentersZ[lane] - openZ);
                 }
@@ -447,6 +456,27 @@ namespace VRB.EditorTools
             hall.transform.localRotation = Quaternion.Euler(0f, -90f, 0f);
             hall.transform.localScale = new Vector3(stretch, 1f, 1f);
             hall.transform.localPosition = new Vector3(FbxLaneCenterZ, 0f, -FbxFoulLineX * stretch);
+
+            // Lets the player play on any of the hall's lanes by sliding the hall sideways.
+            var offsets = new float[FbxLaneCentersZ.Length];
+            for (var i = 0; i < offsets.Length; i++) offsets[i] = FbxLaneCenterZ - FbxLaneCentersZ[i];
+
+            var selector = lane.AddComponent<LaneSelector>();
+            var fields = new SerializedObject(selector);
+            fields.FindProperty("m_Hall").objectReferenceValue = hall.transform;
+            fields.FindProperty("m_BasePosition").vector3Value = hall.transform.localPosition;
+            var offsetArray = fields.FindProperty("m_LaneOffsets");
+            offsetArray.arraySize = offsets.Length;
+            var pinArray = fields.FindProperty("m_DecorPins");
+            pinArray.arraySize = offsets.Length;
+            for (var i = 0; i < offsets.Length; i++)
+            {
+                offsetArray.GetArrayElementAtIndex(i).floatValue = offsets[i];
+                pinArray.GetArrayElementAtIndex(i).objectReferenceValue = hall.transform.Find("FbxPins_Lane" + (i + 1)).gameObject;
+            }
+            fields.FindProperty("m_Seats").arraySize = offsets.Length;
+            fields.ApplyModifiedPropertiesWithoutUndo();
+            selector.Select(0);
         }
 
         // ---------------------------------------------------------------- pins and ball stand
@@ -604,28 +634,37 @@ namespace VRB.EditorTools
 
         static void BuildSelectionCanvas()
         {
-            // 1000 x 700 units at 1.5 mm per unit = 1.5 m x 1.05 m, about 2.6 m in front of the player.
-            var canvas = CreateWorldCanvas("SelectionCanvas", new Vector2(1000f, 700f), 0.0015f, new Vector3(0f, 1.55f, 1.0f));
+            // 1000 x 820 units at 1.5 mm per unit = 1.5 m x 1.23 m, about 2.6 m in front of the player.
+            var canvas = CreateWorldCanvas("SelectionCanvas", new Vector2(1000f, 820f), 0.0015f, new Vector3(0f, 1.55f, 1.0f));
             var view = canvas.AddComponent<LevelSelectionView>();
             var root = canvas.transform;
 
-            MakeText(root, "Title", "Throw Assist", 70f, new Vector2(0f, 285f), new Vector2(900f, 100f), Color.white, FontStyles.Bold);
+            MakeText(root, "Title", "Throw Assist", 70f, new Vector2(0f, 345f), new Vector2(900f, 100f), Color.white, FontStyles.Bold);
+
+            var laneButtons = new Button[FbxLaneCentersZ.Length];
+            MakeText(root, "LaneLabel", "Lane", 44f, new Vector2(-420f, 235f), new Vector2(140f, 70f), new Color(0.65f, 0.70f, 0.80f));
+            for (var i = 0; i < laneButtons.Length; i++)
+                laneButtons[i] = MakeButton(root, "Lane_" + (i + 1), (i + 1).ToString(),
+                    new Vector2(-200f + i * 200f, 235f), new Vector2(170f, 90f), 50f);
 
             var labels = new[] { "Raw Physics", "Weak", "Medium", "Strong" };
-            var positions = new[] { new Vector2(-230f, 130f), new Vector2(230f, 130f), new Vector2(-230f, -10f), new Vector2(230f, -10f) };
+            var positions = new[] { new Vector2(-230f, 95f), new Vector2(230f, 95f), new Vector2(-230f, -45f), new Vector2(230f, -45f) };
             var buttons = new Button[4];
             for (var i = 0; i < 4; i++)
                 buttons[i] = MakeButton(root, "Level_" + labels[i].Replace(" ", ""), labels[i], positions[i], new Vector2(420f, 110f), 50f);
 
-            var description = MakeText(root, "Description", string.Empty, 40f, new Vector2(0f, -140f), new Vector2(920f, 90f),
+            var description = MakeText(root, "Description", string.Empty, 40f, new Vector2(0f, -175f), new Vector2(920f, 90f),
                 new Color(0.85f, 0.88f, 0.95f));
-            var start = MakeButton(root, "StartButton", "Start", new Vector2(0f, -270f), new Vector2(420f, 120f), 60f);
+            var start = MakeButton(root, "StartButton", "Start", new Vector2(0f, -305f), new Vector2(420f, 120f), 60f);
             start.targetGraphic.color = new Color(0.20f, 0.65f, 0.35f, 1f);
 
             var so = new SerializedObject(view);
             var array = so.FindProperty("m_LevelButtons");
             array.arraySize = 4;
             for (var i = 0; i < 4; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = buttons[i];
+            var laneArray = so.FindProperty("m_LaneButtons");
+            laneArray.arraySize = laneButtons.Length;
+            for (var i = 0; i < laneButtons.Length; i++) laneArray.GetArrayElementAtIndex(i).objectReferenceValue = laneButtons[i];
             so.FindProperty("m_StartButton").objectReferenceValue = start;
             so.FindProperty("m_DescriptionText").objectReferenceValue = description;
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -702,6 +741,7 @@ namespace VRB.EditorTools
             SetReference(controller, "m_SelectionView", GameObject.Find("SelectionCanvas").GetComponent<LevelSelectionView>());
             SetReference(controller, "m_Scoreboard", GameObject.Find("ScoreboardCanvas").GetComponent<ScoreboardView>());
             SetReference(controller, "m_Tv", GameObject.Find("TvCanvas").GetComponent<TvScoreView>());
+            SetReference(controller, "m_Lanes", GameObject.Find("Lane").GetComponent<LaneSelector>());
 
             game.SetActive(true);
             EditorSceneManagerUtility.MarkDirty(game.scene);
@@ -745,27 +785,61 @@ namespace VRB.EditorTools
         }
 
         /// <summary>
-        /// Makes the hall's chair closest to the lane (the FBX's Object010, between its table and the lane)
-        /// something the player can sit on. The FBX has no colliders, so a box is added for the ray to hit.
+        /// Makes one of the hall's chairs sit-able for each lane: the one that, once the hall has been slid to that
+        /// lane, stands closest to just behind and beside the throwing spot. The FBX has no colliders, so a box is
+        /// added for the ray to hit. Seats are children of the hall, so they slide with it.
         /// </summary>
         [MenuItem("VRB/Build Seat")]
         public static void BuildSeat()
         {
             DestroyIfExists("Seat");
             var rig = GameObject.Find("XR Origin (XR Rig)");
-            var chair = GameObject.Find("Hall")?.GetComponentsInChildren<Renderer>()
-                .FirstOrDefault(r => r.name == "Object010");
-            if (rig == null || chair == null) return;
+            var hall = GameObject.Find("Hall");
+            var selector = GameObject.Find("Lane")?.GetComponent<LaneSelector>();
+            if (rig == null || hall == null || selector == null) return;
 
-            var seat = new GameObject("Seat");
-            seat.transform.position = new Vector3(chair.bounds.center.x, 0.25f, chair.bounds.center.z);
-            seat.AddComponent<BoxCollider>().size = new Vector3(0.7f, 0.5f, 0.7f);
-            var spot = seat.AddComponent<SeatSpot>();
-            var fields = new SerializedObject(spot);
-            fields.FindProperty("m_Rig").objectReferenceValue = rig.transform;
-            fields.FindProperty("m_Head").objectReferenceValue = rig.GetComponentInChildren<Camera>();
-            fields.ApplyModifiedPropertiesWithoutUndo();
-            EditorSceneManagerUtility.MarkDirty(seat.scene);
+            foreach (var old in hall.GetComponentsInChildren<SeatSpot>(true).ToArray())
+                Object.DestroyImmediate(old.gameObject);
+
+            selector.Select(0);
+            var offsets = new SerializedObject(selector).FindProperty("m_LaneOffsets");
+            var chairs = hall.GetComponentsInChildren<Renderer>()
+                .Where(r => r.name.StartsWith("Object") && r.bounds.size.y > 0.3f && r.bounds.size.y < 0.5f
+                    && r.bounds.size.x < 0.7f && r.bounds.size.z < 0.7f && r.bounds.size.x > 0.3f)
+                .ToList();
+
+            var head = rig.GetComponentInChildren<Camera>();
+            var seats = new SeatSpot[offsets.arraySize];
+            var wanted = new Vector2(1.5f, -2.7f);
+            for (var lane = 0; lane < seats.Length; lane++)
+            {
+                var offset = offsets.GetArrayElementAtIndex(lane).floatValue;
+                var chair = chairs
+                    .Where(r => Mathf.Abs(r.bounds.center.x - offset) < 2.2f && r.bounds.center.z > -4.5f && r.bounds.center.z < -2.0f)
+                    .OrderBy(r => Vector2.Distance(new Vector2(r.bounds.center.x - offset, r.bounds.center.z), wanted))
+                    .FirstOrDefault();
+                if (chair == null) continue;
+
+                var seat = new GameObject("Seat_Lane" + (lane + 1));
+                seat.transform.SetParent(hall.transform, true);
+                seat.transform.position = new Vector3(chair.bounds.center.x, 0.25f, chair.bounds.center.z);
+                seat.transform.rotation = Quaternion.identity;
+                seat.AddComponent<BoxCollider>().size = new Vector3(0.7f, 0.5f, 0.7f);
+                var spot = seat.AddComponent<SeatSpot>();
+                var fields = new SerializedObject(spot);
+                fields.FindProperty("m_Rig").objectReferenceValue = rig.transform;
+                fields.FindProperty("m_Head").objectReferenceValue = head;
+                fields.ApplyModifiedPropertiesWithoutUndo();
+                seats[lane] = spot;
+            }
+
+            var selectorFields = new SerializedObject(selector);
+            var seatArray = selectorFields.FindProperty("m_Seats");
+            seatArray.arraySize = seats.Length;
+            for (var i = 0; i < seats.Length; i++) seatArray.GetArrayElementAtIndex(i).objectReferenceValue = seats[i];
+            selectorFields.ApplyModifiedPropertiesWithoutUndo();
+            selector.Select(0);
+            EditorSceneManagerUtility.MarkDirty(hall.scene);
         }
 
         // ---------------------------------------------------------------- helpers

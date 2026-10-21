@@ -17,6 +17,7 @@ namespace VRB
         [SerializeField] LevelSelectionView m_SelectionView;
         [SerializeField] ScoreboardView m_Scoreboard;
         [SerializeField] TvScoreView m_Tv;
+        [SerializeField] LaneSelector m_Lanes;
         [SerializeField] float m_ResultSeconds = 3f;
 
         ThrowWatcher m_Watcher;
@@ -39,6 +40,7 @@ namespace VRB
             m_Thrower.Thrown += OnThrown;
             m_Rack.Judged += OnJudged;
             m_SelectionView.LevelPicked += OnLevelPicked;
+            m_SelectionView.LanePicked += OnLanePicked;
             m_SelectionView.StartPressed += OnStartPressed;
             m_Scoreboard.RestartPressed += Restart;
         }
@@ -50,6 +52,7 @@ namespace VRB
             m_Thrower.Thrown -= OnThrown;
             m_Rack.Judged -= OnJudged;
             m_SelectionView.LevelPicked -= OnLevelPicked;
+            m_SelectionView.LanePicked -= OnLanePicked;
             m_SelectionView.StartPressed -= OnStartPressed;
             m_Scoreboard.RestartPressed -= Restart;
         }
@@ -73,6 +76,11 @@ namespace VRB
         void OnLevelPicked(ThrowAssistLevel level)
         {
             if (Flow.Phase == GamePhase.SelectingLevel) Flow.SelectLevel(level);
+        }
+
+        void OnLanePicked(int lane)
+        {
+            if (Flow.Phase == GamePhase.SelectingLevel && m_Lanes != null) m_Lanes.Select(lane);
         }
 
         void OnStartPressed()
