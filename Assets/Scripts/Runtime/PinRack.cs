@@ -94,7 +94,14 @@ namespace VRB
             return fallen;
         }
 
-        bool IsFallen(Pin pin) => PinJudge.IsFallen(pin.TiltDegrees, pin.Displacement, pin.InPit, m_Settings);
+        bool IsFallen(Pin pin) => PinJudge.IsFallen(pin.TiltDegrees, IsOffDeck(pin), m_Settings);
+
+        /// <summary>The rack sits on the lane center, so a pin's sideways offset from it is its offset from the center.</summary>
+        bool IsOffDeck(Pin pin)
+        {
+            var position = pin.transform.position;
+            return PinJudge.IsOffDeck(position.x - transform.position.x, position.y, pin.InPit, m_Settings);
+        }
 
         public bool AllPinsAtRest()
         {

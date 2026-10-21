@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: VRB.Runtime::VRB.BowlingConfig
   pinJudge:
     tiltThresholdDegrees: 45
-    displacementThreshold: 0.35
+    deckHalfWidth: 0.5207
+    deckFloorHeight: -0.05
     restLinearSpeed: 0.1
     restAngularSpeed: 1
     restDuration: 1.5

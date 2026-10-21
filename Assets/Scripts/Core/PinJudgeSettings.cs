@@ -9,8 +9,11 @@ namespace VRB.Core
         /// <summary>A pin tilted more than this many degrees from upright counts as fallen.</summary>
         public float tiltThresholdDegrees = 45f;
 
-        /// <summary>A pin that ended up farther than this many meters from its original spot counts as fallen.</summary>
-        public float displacementThreshold = 0.35f;
+        /// <summary>A pin whose base is farther than this many meters from the lane center has left the deck.</summary>
+        public float deckHalfWidth = BowlingDimensions.LaneWidth / 2f;
+
+        /// <summary>A pin whose base is lower than this many meters relative to the lane surface is in a gutter.</summary>
+        public float deckFloorHeight = -0.05f;
 
         /// <summary>A pin is at rest when it moves slower than this (m/s).</summary>
         public float restLinearSpeed = 0.1f;

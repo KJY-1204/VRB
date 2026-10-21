@@ -114,9 +114,14 @@ namespace VRB.Tests
             yield return new WaitForFixedUpdate();
             Assert.That(m_Rack.CountFallen(), Is.EqualTo(3));
 
-            // A pin shoved far from its spot while still upright also counts.
+            // A pin shoved far along the deck but left standing is not a fallen pin.
             var shoved = m_Pins[5].GetComponent<Rigidbody>();
-            shoved.position += new Vector3(0f, 0f, 0.6f);
+            shoved.position += new Vector3(-0.1f, 0f, -0.6f);
+            yield return new WaitForFixedUpdate();
+            Assert.That(m_Rack.CountFallen(), Is.EqualTo(3), "Still standing on the deck.");
+
+            // Pushed past the edge of the lane it has left the deck, so it counts even though it stands.
+            shoved.position += new Vector3(0.9f, 0f, 0f);
             yield return new WaitForFixedUpdate();
             Assert.That(m_Rack.CountFallen(), Is.EqualTo(4));
 
@@ -127,6 +132,22 @@ namespace VRB.Tests
             yield return new WaitForFixedUpdate();
             Assert.That(m_Pins[7].InPit, Is.True);
             Assert.That(m_Rack.CountFallen(), Is.EqualTo(5));
+        }
+
+        [UnityTest]
+        public IEnumerator AStandingPinThatWasShoved_IsPutBackOnItsSpot_NotSweptAway()
+        {
+            yield return new WaitForSeconds(0.5f);
+            var shoved = m_Pins[4].GetComponent<Rigidbody>();
+            shoved.position += new Vector3(0.1f, 0f, -0.5f);
+            yield return new WaitForFixedUpdate();
+            Assert.That(m_Rack.CountFallen(), Is.EqualTo(0));
+
+            m_Rack.ClearFallenAndRespot();
+            yield return new WaitForSeconds(0.3f);
+
+            Assert.That(m_Rack.ActiveCount, Is.EqualTo(10), "Nothing fell, so nothing is swept away.");
+            Assert.That(m_Pins[4].Displacement, Is.LessThan(0.01f), "The pinsetter stood it back on its spot.");
         }
 
         [UnityTest]

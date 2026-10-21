@@ -66,7 +66,7 @@ Mac에서는 코드 변경 없이 프로젝트 분석만 했고, 실기기 검�
 2. 위 "실기기 검증이 남은 작업" 표를 진행하고, 끝난 항목은 `tasks.md`에 체크합니다.
 3. **4.7**: 던져 보면서 `Assets/VRB/Config/BowlingConfig.asset`의 값을 조정합니다. 값을 바꾸려면 Unity 에디터와 재빌드가 필요하니, 학교에 Unity가 없으면 **튜닝 값을 메모해 두었다가 집에서 반영**하세요.
    - `throwAssist`: `weakPull`(0), `mediumPull`(0.3), `strongPull`(0.6), `averagingWindowSeconds`(0.1), `maxUpwardSpeed`(1)
-   - `pinJudge`: 쓰러짐 각도(45°), 이동 거리(0.35m), 정지 속도, 정지 유지 시간(1.5초), 최대 대기(10초)
+   - `pinJudge`: 쓰러짐 각도(45°), 덱 이탈 기준(레인 반폭 `deckHalfWidth`, 거터 높이 `deckFloorHeight`), 정지 속도, 정지 유지 시간(1.5초), 최대 대기(10초)
 4. **2.4**: 프로파일링 결과 예산이 남으면 볼링장 FBX의 가벼운 장식을 추가합니다. (현재는 핀·공 메시만 사용)
 
 ### 검증을 모두 마친 뒤

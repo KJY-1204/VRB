@@ -13,31 +13,65 @@ namespace VRB.Tests
         [Test]
         public void LyingPin_IsFallen()
         {
-            Assert.That(PinJudge.IsFallen(90f, 0.1f, false, m_Settings), Is.True);
+            Assert.That(PinJudge.IsFallen(90f, false, m_Settings), Is.True);
         }
 
         [Test]
         public void LeaningPinWithinThreshold_IsStanding()
         {
-            Assert.That(PinJudge.IsFallen(20f, 0.05f, false, m_Settings), Is.False);
+            Assert.That(PinJudge.IsFallen(20f, false, m_Settings), Is.False);
         }
 
         [Test]
         public void TiltExactlyAtThreshold_IsStillStanding()
         {
-            Assert.That(PinJudge.IsFallen(m_Settings.tiltThresholdDegrees, 0f, false, m_Settings), Is.False);
+            Assert.That(PinJudge.IsFallen(m_Settings.tiltThresholdDegrees, false, m_Settings), Is.False);
         }
 
         [Test]
-        public void PinInPit_IsFallenEvenIfUpright()
+        public void PinOffTheDeck_IsFallenEvenIfUpright()
         {
-            Assert.That(PinJudge.IsFallen(0f, 0f, true, m_Settings), Is.True);
+            Assert.That(PinJudge.IsFallen(0f, true, m_Settings), Is.True);
         }
 
         [Test]
-        public void PinMovedFarFromSpot_IsFallenEvenIfUpright()
+        public void StandingPinShovedAlongTheDeck_StillStands()
         {
-            Assert.That(PinJudge.IsFallen(5f, m_Settings.displacementThreshold + 0.01f, false, m_Settings), Is.True);
+            // A pin the ball pushed 40 cm sideways and 60 cm back but left standing is not a fallen pin.
+            Assert.That(PinJudge.IsOffDeck(0.4f, 0f, false, m_Settings), Is.False);
+            Assert.That(PinJudge.IsFallen(5f, false, m_Settings), Is.False);
+        }
+
+        [Test]
+        public void PinInThePit_IsOffTheDeck()
+        {
+            Assert.That(PinJudge.IsOffDeck(0f, 0f, true, m_Settings), Is.True);
+        }
+
+        [Test]
+        public void PinPastTheLaneEdge_IsOffTheDeck()
+        {
+            Assert.That(PinJudge.IsOffDeck(m_Settings.deckHalfWidth + 0.01f, 0f, false, m_Settings), Is.True);
+            Assert.That(PinJudge.IsOffDeck(-(m_Settings.deckHalfWidth + 0.01f), 0f, false, m_Settings), Is.True, "Either side.");
+        }
+
+        [Test]
+        public void PinStandingAtTheEdgeOfTheLane_IsStillOnTheDeck()
+        {
+            Assert.That(PinJudge.IsOffDeck(m_Settings.deckHalfWidth - 0.01f, 0f, false, m_Settings), Is.False);
+        }
+
+        [Test]
+        public void PinInTheGutter_IsOffTheDeck()
+        {
+            Assert.That(PinJudge.IsOffDeck(0.4f, -0.12f, false, m_Settings), Is.True, "Down in the gutter, even if it stands.");
+        }
+
+        [Test]
+        public void ALyingPinOnTheLane_IsOnTheDeckButStillFallen()
+        {
+            Assert.That(PinJudge.IsOffDeck(0.2f, 0.06f, false, m_Settings), Is.False);
+            Assert.That(PinJudge.IsFallen(90f, false, m_Settings), Is.True);
         }
 
         [Test]

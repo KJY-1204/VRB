@@ -43,7 +43,7 @@ The system SHALL determine the number of fallen pins only after all pins have co
 - **THEN** 시스템은 그 시점의 상태로 쓰러진 핀 수를 확정한다
 
 ### Requirement: 쓰러짐 기준
-The system SHALL count a pin as fallen when it is tilted beyond a threshold angle from upright, has moved far from its original spot, or has dropped into the pit.
+The system SHALL count a pin as fallen when it is tilted beyond a threshold angle from upright, or when it has left the pin deck (dropped into the pit, gone past either edge of the lane, or ended down in a gutter). A pin that was only pushed along the deck and is still standing SHALL NOT be counted, however far it moved.
 
 #### Scenario: 완전히 눕는다
 - **WHEN** 핀이 기준 각도보다 많이 기울어진 채 멈춘다
@@ -57,12 +57,24 @@ The system SHALL count a pin as fallen when it is tilted beyond a threshold angl
 - **WHEN** 핀이 레인 끝의 피트 영역에 들어간다
 - **THEN** 그 핀은 쓰러진 것으로 센다
 
-### Requirement: 투구 후 핀 리셋
-The system SHALL restore all ten pins to their initial formation after each throw result has been shown, so that every throw starts from a full set of pins.
+#### Scenario: 레인 밖으로 나간다
+- **WHEN** 핀이 서 있는 채로 레인 가장자리를 벗어나거나 거터 안으로 들어간다
+- **THEN** 그 핀은 쓰러진 것으로 센다
 
-#### Scenario: 결과 표시 후 리셋
-- **WHEN** 한 번의 투구 결과가 확정되어 표시된 뒤 다음 투구를 준비한다
+#### Scenario: 밀려났지만 서 있다
+- **WHEN** 핀이 원래 자리에서 멀리 밀려났지만 덱 위에 서 있다
+- **THEN** 그 핀은 서 있는 것으로 센다
+
+### Requirement: 투구 후 핀 리셋
+The system SHALL, after each throw result has been shown, set up the pins for the next throw as a pinsetter does: a new frame (or a fresh rack in the tenth frame) gets all ten pins on their initial spots, and between the two balls of a frame the fallen pins are cleared away while the standing ones are put back upright on their spots.
+
+#### Scenario: 새 프레임
+- **WHEN** 스트라이크이거나 한 프레임의 마지막 공의 결과가 표시된 뒤 다음 투구를 준비한다
 - **THEN** 10개 핀이 모두 처음 배치로 돌아가 정지 상태가 된다
+
+#### Scenario: 같은 프레임의 두 번째 공
+- **WHEN** 첫 공이 핀을 일부만 쓰러뜨린 결과가 표시된 뒤 다음 투구를 준비한다
+- **THEN** 쓰러진 핀은 치워지고, 서 있던 핀은 원래 자리에 똑바로 선 채 남는다
 
 ### Requirement: 충돌 효과음
 The system SHALL play a sound effect when the ball rolls on the lane and when pins are hit.
