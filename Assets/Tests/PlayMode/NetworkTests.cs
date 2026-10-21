@@ -84,7 +84,7 @@ namespace VRB.Tests
             Assert.That(m_Session.State, Is.EqualTo(NetState.Hosting));
             Assert.That(player.IsLocalPlayer, Is.True);
             Assert.That(player.Lane, Is.EqualTo(0));
-            Assert.That(player.PlayerName, Is.EqualTo("Player"), "The bridge names the local player.");
+            Assert.That(player.PlayerName, Is.EqualTo("P1"), "The bridge names the local player after their lane.");
         }
 
         [UnityTest]
@@ -126,7 +126,7 @@ namespace VRB.Tests
             yield return null;
 
             Assert.That(m_Scoreboard.IsRowVisible(1), Is.True);
-            Assert.That(m_Scoreboard.PlayerNameText(1), Is.EqualTo("Player"));
+            Assert.That(m_Scoreboard.PlayerNameText(1), Is.EqualTo("P1"));
             Assert.That(m_Scoreboard.FrameMarksText(1, 1), Is.EqualTo("X"));
             Assert.That(m_Scoreboard.PlayerTotalText(1), Is.EqualTo("10"));
         }
@@ -144,7 +144,7 @@ namespace VRB.Tests
             var roster = NetPlayer.Roster();
 
             Assert.That(roster.PlayerCount, Is.EqualTo(1));
-            Assert.That(roster.Players[0].Name, Is.EqualTo("Player"));
+            Assert.That(roster.Players[0].Name, Is.EqualTo("P1"));
             Assert.That(roster.Players[0].Session.Score, Is.EqualTo(4));
         }
 

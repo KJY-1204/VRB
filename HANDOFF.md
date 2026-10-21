@@ -7,7 +7,7 @@ Mac에서는 코드 변경 없이 프로젝트 분석만 했고, 실기기 검�
 ## 한눈에 보는 상태
 
 - **구현은 끝났고, 남은 것은 대부분 Quest 3S 실기기 검증입니다.** 자동 테스트는 모두 통과했습니다.
-  - EditMode 135개, PlayMode 75개 통과 (`Window > General > Test Runner`)
+  - EditMode 162개, PlayMode 88개 통과 (`Window > General > Test Runner`)
   - Android APK 빌드 성공 (약 51MB)
 - 작업 진행률: `tasks.md` 기준 **19/30 완료**. 남은 11개는 모두 아래의 실기기 검증입니다.
 - 실기기가 없어서 "실기기에서 확인한다"가 검증 기준인 작업은 구현·시뮬레이션 테스트까지 했지만 **체크하지 않았습니다.**

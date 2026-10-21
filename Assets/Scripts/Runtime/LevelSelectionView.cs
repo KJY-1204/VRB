@@ -16,16 +16,21 @@ namespace VRB
         [SerializeField] Button[] m_LaneButtons = new Button[0];    // index = lane, 0-based
         [SerializeField] Button[] m_PlayerButtons = new Button[0];  // index = player count - 1
         [SerializeField] Button m_StartButton;
+        [SerializeField] Button m_NetworkButton;
         [SerializeField] TMP_Text m_DescriptionText;
 
         public event Action<ThrowAssistLevel> LevelPicked;
         public event Action<int> LanePicked;
         public event Action<int> PlayersPicked;
+        public event Action NetworkPressed;
         public event Action StartPressed;
 
         public ThrowAssistLevel Selected { get; private set; } = ThrowAssist.Default;
         public int SelectedLane { get; private set; }
         public int SelectedPlayers { get; private set; } = 1;
+
+        bool m_WantVisible = true;
+        bool m_Suppressed;
         public string DescriptionText => m_DescriptionText != null ? m_DescriptionText.text : string.Empty;
 
         void Awake()
@@ -49,6 +54,41 @@ namespace VRB
             }
 
             m_StartButton.onClick.AddListener(() => StartPressed?.Invoke());
+            if (m_NetworkButton != null) m_NetworkButton.onClick.AddListener(() => NetworkPressed?.Invoke());
+            Refresh();
+        }
+
+        /// <summary>
+        /// While another screen (the network menu) takes this one's place the start screen stays hidden even when the
+        /// game asks for it to be shown.
+        /// </summary>
+        public void SetSuppressed(bool suppressed)
+        {
+            m_Suppressed = suppressed;
+            gameObject.SetActive(m_WantVisible && !m_Suppressed);
+        }
+
+        /// <summary>
+        /// In a network game the host gives each device its lane and everyone plays their own game, so the lane and player
+        /// count cannot be picked here.
+        /// </summary>
+        public void SetNetworked(bool networked)
+        {
+            foreach (var button in m_LaneButtons) button.interactable = !networked;
+            foreach (var button in m_PlayerButtons) button.interactable = !networked;
+        }
+
+        /// <summary>Set the highlighted lane without raising an event (used when the host assigns one).</summary>
+        public void SetSelectedLane(int lane)
+        {
+            SelectedLane = lane;
+            Refresh();
+        }
+
+        /// <summary>Set the highlighted player count without raising an event.</summary>
+        public void SetSelectedPlayers(int count)
+        {
+            SelectedPlayers = count;
             Refresh();
         }
 
@@ -95,7 +135,11 @@ namespace VRB
             Refresh();
         }
 
-        public void SetVisible(bool visible) => gameObject.SetActive(visible);
+        public void SetVisible(bool visible)
+        {
+            m_WantVisible = visible;
+            gameObject.SetActive(visible && !m_Suppressed);
+        }
 
         public bool IsHighlighted(ThrowAssistLevel level)
         {

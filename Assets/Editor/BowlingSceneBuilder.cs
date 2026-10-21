@@ -794,8 +794,9 @@ namespace VRB.EditorTools
 
         static void BuildSelectionCanvas()
         {
-            // 1000 x 900 units at 1.5 mm per unit = 1.5 m x 1.35 m, about 2.6 m in front of the player.
-            var canvas = CreateWorldCanvas("SelectionCanvas", new Vector2(1000f, 900f), 0.0015f, new Vector3(0f, 1.55f, 1.0f));
+            // 1000 x 900 units at 1.5 mm per unit = 1.5 m x 1.35 m, about 2.6 m in front of the player. Its top stays under
+            // the hall's hanging light cove, whose underside is 2.12 m up over the lane.
+            var canvas = CreateWorldCanvas("SelectionCanvas", new Vector2(1000f, 900f), 0.0015f, new Vector3(0f, 1.4f, 1.0f));
             var view = canvas.AddComponent<LevelSelectionView>();
             var root = canvas.transform;
 
@@ -826,8 +827,10 @@ namespace VRB.EditorTools
             var start = MakeButton(root, "StartButton", "START", new Vector2(0f, -350f), new Vector2(460f, 120f), 62f);
             start.targetGraphic.color = UiPalette.Go;
             start.transform.Find("Ring").GetComponent<Image>().color = new Color(0.55f, 1f, 0.75f, 0.9f);
+            var online = MakeButton(root, "NetworkButton", "ONLINE", new Vector2(-370f, -350f), new Vector2(210f, 90f), 36f);
 
             var so = new SerializedObject(view);
+            so.FindProperty("m_NetworkButton").objectReferenceValue = online;
             var array = so.FindProperty("m_LevelButtons");
             array.arraySize = 4;
             for (var i = 0; i < 4; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = buttons[i];
@@ -1169,6 +1172,8 @@ namespace VRB.EditorTools
         {
             DestroyIfExists("Network");
             DestroyIfExists("NetworkBridge");
+            DestroyIfExists("NetworkMenu");
+            DestroyIfExists("NetworkMenuCanvas");
             var game = GameObject.Find("Game");
             var lane = GameObject.Find("Lane")?.GetComponent<LaneSelector>();
             if (game == null || lane == null) return;
@@ -1200,11 +1205,119 @@ namespace VRB.EditorTools
             var bridgeFields = new SerializedObject(bridge);
             bridgeFields.FindProperty("m_Game").objectReferenceValue = game.GetComponent<GameController>();
             bridgeFields.FindProperty("m_Lanes").objectReferenceValue = lane;
+            var selection = GameObject.Find("SelectionCanvas").GetComponent<LevelSelectionView>();
+            bridgeFields.FindProperty("m_Selection").objectReferenceValue = selection;
             bridgeFields.ApplyModifiedPropertiesWithoutUndo();
+
+            BuildNetworkMenu(session, selection);
 
             // Sockets need the internet permission on the headset, even for a game on the local network.
             PlayerSettings.Android.forceInternetPermission = true;
             EditorSceneManagerUtility.MarkDirty(root.scene);
+        }
+
+        /// <summary>
+        /// The screen for hosting a game or joining one: three or four panels on a canvas that takes the start screen's
+        /// place, and an always-active "NetworkMenu" object that runs them.
+        /// </summary>
+        static void BuildNetworkMenu(NetworkSession session, LevelSelectionView selection)
+        {
+            var canvas = CreateWorldCanvas("NetworkMenuCanvas", new Vector2(1000f, 900f), 0.0015f, new Vector3(0f, 1.4f, 1.0f));
+            var root = canvas.transform;
+            MakeText(root, "Title", "PLAY TOGETHER", 76f, new Vector2(0f, 395f), new Vector2(900f, 110f), Color.white, FontStyles.Bold, 8f);
+            MakeCard(root, "TitleBar", UiPalette.Accent, new Vector2(0f, 338f), new Vector2(260f, 8f), 4f);
+            var status = MakeText(root, "Status", string.Empty, 40f, new Vector2(0f, -395f), new Vector2(920f, 60f),
+                UiPalette.Amber, FontStyles.Bold, 1f);
+
+            GameObject Panel(string name)
+            {
+                var panel = new GameObject(name, typeof(RectTransform));
+                panel.transform.SetParent(root, false);
+                return panel;
+            }
+
+            // First screen: host or join.
+            var offline = Panel("OfflinePanel");
+            MakeText(offline.transform, "Hint", "Same Wi-Fi, up to four players.\nEveryone bowls on a lane of their own.", 42f,
+                new Vector2(0f, 235f), new Vector2(900f, 140f), UiPalette.Muted);
+            var host = MakeButton(offline.transform, "HostButton", "HOST A GAME", new Vector2(0f, 60f), new Vector2(520f, 120f), 56f);
+            host.targetGraphic.color = UiPalette.Go;
+            var join = MakeButton(offline.transform, "JoinButton", "JOIN A GAME", new Vector2(0f, -100f), new Vector2(520f, 120f), 56f);
+            var close = MakeButton(offline.transform, "CloseButton", "BACK", new Vector2(0f, -270f), new Vector2(360f, 100f), 48f);
+
+            // Hosting: read the address out to the others.
+            var hosting = Panel("HostingPanel");
+            MakeText(hosting.transform, "AddressLabel", "TELL THE OTHERS THIS ADDRESS", 38f, new Vector2(0f, 280f),
+                new Vector2(900f, 60f), UiPalette.Muted, FontStyles.Bold, 4f);
+            var address = MakeText(hosting.transform, "Address", string.Empty, 104f, new Vector2(0f, 160f), new Vector2(940f, 140f),
+                Color.white, FontStyles.Bold);
+            MakeText(hosting.transform, "Hint", "They press ONLINE, then JOIN A GAME, and type it.", 38f, new Vector2(0f, 55f),
+                new Vector2(900f, 60f), UiPalette.Muted);
+            var hostingDone = MakeButton(hosting.transform, "DoneButton", "DONE", new Vector2(0f, -120f), new Vector2(440f, 110f), 54f);
+            hostingDone.targetGraphic.color = UiPalette.Go;
+            var hostingLeave = MakeButton(hosting.transform, "LeaveButton", "CLOSE THE GAME", new Vector2(0f, -265f), new Vector2(440f, 100f), 40f);
+
+            // Joining: type the address on a keypad.
+            var joining = Panel("JoinPanel");
+            MakeText(joining.transform, "EntryLabel", "HOST ADDRESS", 34f, new Vector2(0f, 300f), new Vector2(900f, 60f),
+                UiPalette.Muted, FontStyles.Bold, 4f);
+            var entry = MakeText(joining.transform, "Entry", string.Empty, 88f, new Vector2(0f, 220f), new Vector2(940f, 120f),
+                Color.white, FontStyles.Bold);
+            var keys = new Button[11];
+            var columns = new[] { -300f, -140f, 20f };
+            var rows = new[] { 120f, 10f, -100f, -210f };
+            for (var i = 1; i <= 9; i++)
+                keys[i] = MakeButton(joining.transform, "Key" + i, i.ToString(),
+                    new Vector2(columns[(i - 1) % 3], rows[(i - 1) / 3]), new Vector2(140f, 95f), 52f);
+            keys[10] = MakeButton(joining.transform, "KeyDot", ".", new Vector2(columns[0], rows[3]), new Vector2(140f, 95f), 60f);
+            keys[0] = MakeButton(joining.transform, "Key0", "0", new Vector2(columns[1], rows[3]), new Vector2(140f, 95f), 52f);
+            var delete = MakeButton(joining.transform, "DeleteButton", "DEL", new Vector2(columns[2], rows[3]), new Vector2(140f, 95f), 40f);
+            var connect = MakeButton(joining.transform, "ConnectButton", "CONNECT", new Vector2(290f, 65f), new Vector2(270f, 210f), 44f);
+            connect.targetGraphic.color = UiPalette.Go;
+            var joinBack = MakeButton(joining.transform, "BackButton", "BACK", new Vector2(290f, -155f), new Vector2(270f, 100f), 44f);
+
+            // Connected to someone else's game.
+            var connected = Panel("ConnectedPanel");
+            MakeText(connected.transform, "Title", "CONNECTED", 88f, new Vector2(0f, 230f), new Vector2(900f, 120f), Color.white, FontStyles.Bold, 6f);
+            var lane = MakeText(connected.transform, "Lane", string.Empty, 60f, new Vector2(0f, 100f), new Vector2(900f, 90f),
+                UiPalette.Accent, FontStyles.Bold);
+            MakeText(connected.transform, "Hint", "Pick your throw assist and press START.", 38f, new Vector2(0f, 10f),
+                new Vector2(900f, 60f), UiPalette.Muted);
+            var connectedDone = MakeButton(connected.transform, "DoneButton", "DONE", new Vector2(0f, -120f), new Vector2(440f, 110f), 54f);
+            connectedDone.targetGraphic.color = UiPalette.Go;
+            var connectedLeave = MakeButton(connected.transform, "LeaveButton", "LEAVE THE GAME", new Vector2(0f, -265f), new Vector2(440f, 100f), 40f);
+
+            var menu = new GameObject("NetworkMenu").AddComponent<NetworkMenuView>();
+            var so = new SerializedObject(menu);
+            so.FindProperty("m_Session").objectReferenceValue = session;
+            so.FindProperty("m_Selection").objectReferenceValue = selection;
+            so.FindProperty("m_Canvas").objectReferenceValue = canvas;
+            so.FindProperty("m_OfflinePanel").objectReferenceValue = offline;
+            so.FindProperty("m_HostingPanel").objectReferenceValue = hosting;
+            so.FindProperty("m_JoinPanel").objectReferenceValue = joining;
+            so.FindProperty("m_ConnectedPanel").objectReferenceValue = connected;
+            so.FindProperty("m_StatusText").objectReferenceValue = status;
+            so.FindProperty("m_AddressText").objectReferenceValue = address;
+            so.FindProperty("m_EntryText").objectReferenceValue = entry;
+            so.FindProperty("m_ConnectedText").objectReferenceValue = lane;
+            so.FindProperty("m_HostButton").objectReferenceValue = host;
+            so.FindProperty("m_JoinButton").objectReferenceValue = join;
+            so.FindProperty("m_CloseButton").objectReferenceValue = close;
+            so.FindProperty("m_DeleteButton").objectReferenceValue = delete;
+            so.FindProperty("m_ConnectButton").objectReferenceValue = connect;
+            so.FindProperty("m_JoinBackButton").objectReferenceValue = joinBack;
+
+            void Fill(string field, params Button[] buttons)
+            {
+                var array = so.FindProperty(field);
+                array.arraySize = buttons.Length;
+                for (var i = 0; i < buttons.Length; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = buttons[i];
+            }
+
+            Fill("m_DoneButtons", hostingDone, connectedDone);
+            Fill("m_LeaveButtons", hostingLeave, connectedLeave);
+            Fill("m_KeyButtons", keys);
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // ---------------------------------------------------------------- helpers

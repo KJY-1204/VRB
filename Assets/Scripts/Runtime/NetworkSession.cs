@@ -95,14 +95,16 @@ namespace VRB
         {
             if (State == NetState.Hosting || State == NetState.Connecting || State == NetState.Connected) return false;
 
-            if (!IPAddress.TryParse((hostAddress ?? string.Empty).Trim(), out var address) || address.AddressFamily != AddressFamily.InterNetwork)
+            // Four numbers with dots, strictly: the system's own parser would take "192.168.0" as an address too.
+            var address = (hostAddress ?? string.Empty).Trim();
+            if (!AddressEntry.IsValid(address))
             {
                 Set(NetState.Failed, "That is not an address like 192.168.0.12.");
                 return false;
             }
 
             EnsurePlayerPrefabRegistered();
-            m_Transport.SetConnectionData(address.ToString(), m_Port);
+            m_Transport.SetConnectionData(address, m_Port);
             if (!m_Manager.StartClient())
             {
                 Set(NetState.Failed, "Could not start joining.");
