@@ -57,6 +57,7 @@ namespace VRB.EditorTools
             ConfigureRig();
             BuildSeat();
             BuildMirror();
+            BuildNetwork();
             ConfigureLighting();
         }
 
@@ -1154,6 +1155,56 @@ namespace VRB.EditorTools
 
             AssetDatabase.SaveAssets();
             EditorSceneManagerUtility.MarkDirty(panel.scene);
+        }
+
+        const string NetPlayerPrefabPath = PrefabDir + "/NetPlayer.prefab";
+
+        /// <summary>
+        /// What multiplayer needs in the scene: a "Network" object with the network manager, its transport and the session
+        /// that starts and stops games, plus a "NetworkBridge" object that ties the game on this device to the other
+        /// players. The player prefab it spawns for every connected device is built here too.
+        /// </summary>
+        [MenuItem("VRB/Build Network")]
+        public static void BuildNetwork()
+        {
+            DestroyIfExists("Network");
+            DestroyIfExists("NetworkBridge");
+            var game = GameObject.Find("Game");
+            var lane = GameObject.Find("Lane")?.GetComponent<LaneSelector>();
+            if (game == null || lane == null) return;
+
+            EnsureFolder("Assets/VRB", "Prefabs");
+            var playerObject = new GameObject("NetPlayer");
+            playerObject.AddComponent<Unity.Netcode.NetworkObject>();
+            playerObject.AddComponent<NetPlayer>();
+            var playerPrefab = PrefabUtility.SaveAsPrefabAsset(playerObject, NetPlayerPrefabPath);
+            Object.DestroyImmediate(playerObject);
+            AssetDatabase.ImportAsset(NetPlayerPrefabPath, ImportAssetOptions.ForceSynchronousImport);
+            playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(NetPlayerPrefabPath);
+
+            var root = new GameObject("Network");
+            var manager = root.AddComponent<Unity.Netcode.NetworkManager>();
+            var transport = root.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
+            manager.NetworkConfig.NetworkTransport = transport;
+            manager.NetworkConfig.PlayerPrefab = playerPrefab;
+            manager.NetworkConfig.ConnectionApproval = true;
+
+            var session = root.AddComponent<NetworkSession>();
+            var sessionFields = new SerializedObject(session);
+            sessionFields.FindProperty("m_PlayerPrefab").objectReferenceValue = playerPrefab;
+            sessionFields.ApplyModifiedPropertiesWithoutUndo();
+
+            // The network manager keeps itself alive across scene loads, so everything that points into this scene lives on
+            // an object of its own that goes away with the scene.
+            var bridge = new GameObject("NetworkBridge").AddComponent<NetworkBridge>();
+            var bridgeFields = new SerializedObject(bridge);
+            bridgeFields.FindProperty("m_Game").objectReferenceValue = game.GetComponent<GameController>();
+            bridgeFields.FindProperty("m_Lanes").objectReferenceValue = lane;
+            bridgeFields.ApplyModifiedPropertiesWithoutUndo();
+
+            // Sockets need the internet permission on the headset, even for a game on the local network.
+            PlayerSettings.Android.forceInternetPermission = true;
+            EditorSceneManagerUtility.MarkDirty(root.scene);
         }
 
         // ---------------------------------------------------------------- helpers

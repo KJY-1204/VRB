@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 using VRB.Core;
@@ -25,6 +26,12 @@ namespace VRB
         Coroutine m_ResultRoutine;
 
         public GameFlow Flow { get; private set; }
+
+        /// <summary>
+        /// Where the scoreboard rows come from when it should show more than this device's own match (the players on
+        /// other devices). Leave it null to show the local match.
+        /// </summary>
+        public Func<Match> ScoreboardMatch { get; set; }
 
         void Awake()
         {
@@ -151,12 +158,15 @@ namespace VRB
 
         void OnPhaseChanged(GamePhase previous, GamePhase current) => ShowCurrentPhase();
 
+        /// <summary>Redraw the boards, for example when other players' scores changed.</summary>
+        public void RefreshBoards() => ShowCurrentPhase();
+
         void ShowCurrentPhase()
         {
             var selecting = Flow.Phase == GamePhase.SelectingLevel;
             m_SelectionView.SetVisible(selecting);
             m_Scoreboard.SetVisible(!selecting);
-            m_Scoreboard.Refresh(Flow.Phase, Flow.Match);
+            m_Scoreboard.Refresh(Flow.Phase, Flow.Match, ScoreboardMatch?.Invoke() ?? Flow.Match);
             if (m_Tv != null) m_Tv.Refresh(Flow.Phase, Flow.Match);
         }
     }

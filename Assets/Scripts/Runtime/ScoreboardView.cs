@@ -62,11 +62,18 @@ namespace VRB
 
         public void SetVisible(bool visible) => gameObject.SetActive(visible);
 
-        public void Refresh(GamePhase phase, Match match)
-        {
-            m_StatusText.text = StatusFor(phase, match);
-            m_StatusText.color = UiPalette.StatusColor(phase, match);
+        public void Refresh(GamePhase phase, Match match) => Refresh(phase, match, match);
 
+        /// <summary>
+        /// Shows the message line for <paramref name="statusMatch"/> (the game on this device) and the rows for
+        /// <paramref name="rowsMatch"/>, which is the same match unless the scores of players on other devices are shown.
+        /// </summary>
+        public void Refresh(GamePhase phase, Match statusMatch, Match rowsMatch)
+        {
+            m_StatusText.text = StatusFor(phase, statusMatch);
+            m_StatusText.color = UiPalette.StatusColor(phase, statusMatch);
+
+            var match = rowsMatch;
             for (var p = 0; p < m_Rows.Length; p++)
             {
                 var row = m_Rows[p];

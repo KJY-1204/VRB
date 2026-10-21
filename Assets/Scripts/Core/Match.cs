@@ -7,15 +7,20 @@ namespace VRB.Core
     /// <summary>One person in a match: a name and a game of their own.</summary>
     public sealed class Player
     {
+        /// <summary>Names are cut to this many characters so they fit on the scoreboard.</summary>
+        public const int MaxNameLength = 8;
+
         public int Number { get; }
         public string Name { get; }
         public GameSession Session { get; } = new GameSession();
 
-        public Player(int number)
+        public Player(int number, string name = null)
         {
             Number = number;
-            Name = "P" + number;
+            Name = string.IsNullOrWhiteSpace(name) ? "P" + number : Shorten(name.Trim());
         }
+
+        static string Shorten(string name) => name.Length <= MaxNameLength ? name : name.Substring(0, MaxNameLength);
     }
 
     /// <summary>
@@ -38,6 +43,53 @@ namespace VRB.Core
                     $"A match has between 1 and {MaxPlayers} players.");
 
             for (var i = 1; i <= playerCount; i++) m_Players.Add(new Player(i));
+        }
+
+        Match(IReadOnlyList<string> names)
+        {
+            for (var i = 0; i < names.Count; i++) m_Players.Add(new Player(i + 1, names[i]));
+        }
+
+        /// <summary>
+        /// Rebuilds a match from what players report: their names and the pin count of each throw, in order. It is for
+        /// showing a game that is played elsewhere (over the network), so every player's throws are simply replayed into
+        /// a scorecard of their own. Throws that break the rules are ignored from that point on, so a bad report cannot
+        /// make a scorecard throw or show an impossible score.
+        /// </summary>
+        /// <param name="currentIndex">Which player to treat as the one up, for highlighting (the local player).</param>
+        public static Match Replay(IReadOnlyList<(string Name, IReadOnlyList<int> Throws)> players, int currentIndex)
+        {
+            if (players == null) throw new ArgumentNullException(nameof(players));
+            if (players.Count < 1 || players.Count > MaxPlayers)
+                throw new ArgumentOutOfRangeException(nameof(players), players.Count,
+                    $"A match has between 1 and {MaxPlayers} players.");
+            if (currentIndex < 0 || currentIndex >= players.Count)
+                throw new ArgumentOutOfRangeException(nameof(currentIndex), currentIndex, "No such player.");
+
+            var match = new Match(players.Select(p => p.Name).ToList());
+            for (var i = 0; i < players.Count; i++)
+            {
+                var session = match.m_Players[i].Session;
+                foreach (var pins in players[i].Throws ?? new int[0])
+                {
+                    try
+                    {
+                        session.RecordThrow(pins);
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        break;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            match.m_Current = currentIndex;
+            if (match.Current.Session.ThrowCount > 0) match.LastThrower = match.Current;
+            return match;
         }
 
         public IReadOnlyList<Player> Players => m_Players;
