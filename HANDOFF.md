@@ -69,8 +69,18 @@ Mac에서는 코드 변경 없이 프로젝트 분석만 했고, 실기기 검�
 2. **EditMode/PlayMode 테스트가 그대로 통과하는지** 확인합니다. (`Window > General > Test Runner`)
 3. **APK를 미리 빌드해 둡니다.** 학교에서는 설치만 하면 되도록 USB 메모리·클라우드에 복사해 가져갑니다. (학교 PC에 Unity 환경이 없을 수 있음) 학교 노트북이나 PC에 adb(또는 SideQuest/Meta Quest Developer Hub)가 있는지도 확인하세요.
 4. 기기 없이 가능한 일을 진행합니다.
-   - 다음 큰 작업은 **네트워크 멀티플레이**입니다(각자 자기 레인에서 물리를 돌리고 점수만 공유하는 방식을 검토 중). 점수와 차례는 이미 플레이어별로 분리돼 있습니다(`Match`).
+   - **네트워크 멀티플레이는 같은 와이파이용 1~3단계(접속 화면, 상대 레인의 핀·공, 상대 머리·손)까지 구현됐습니다.** 남은 일은 아래 "네트워크 이어서 할 일"을 보세요. 점수와 차례는 플레이어별로 분리돼 있습니다(`Match`).
    - 에디터 Play 모드 확인(XR Device Simulator 등)은 보조일 뿐 실기기 검증(아래 표)을 대체하지 못합니다. 체크박스는 채우지 마세요.
+
+### 네트워크 이어서 할 일 (우선순위 순)
+
+1. **Quest 두 대로 같은 와이파이에서 실기기 확인.** 한 대에서 호스트를 열고 다른 대에서 주소를 입력해 접속합니다. 확인할 것: 레인 자동 배정, 상대 점수판 반영, 상대 레인의 핀·공 움직임이 끊기지 않는지, 상대 머리·손 위치가 맞는지. 문제가 보이면 `RemoteLane`의 `m_Smoothing`, `LaneBroadcaster`/`AvatarBroadcaster`의 전송 간격(`m_Interval`)을 조정합니다.
+2. **아바타 다듬기**: 이름표(상대 이름을 머리 위에), 몸통·팔, 앉았을 때 자세. 지금은 구 세 개(머리+바이저, 손 둘)뿐입니다.
+3. **음성 대화**: Unity Vivox 등 검토 필요(Unity 계정 로그인이 필요할 수 있음).
+4. **인터넷 연결(Relay)**: 같은 와이파이가 아닌 곳에서 접속하려면 Unity Relay가 필요합니다. 이 컴퓨터에서 Unity 계정에 로그인해야 합니다.
+5. 접속 중간 이탈·재접속, 4명 동시 접속 확인(지금 자동 테스트는 2대까지).
+
+관련 코드: `NetPlayer`(복제 데이터, 두 개의 비신뢰 RPC), `NetworkSession`(호스트/접속), `NetworkBridge`·`NetworkMenuView`(UI), `LaneBroadcaster`·`RemoteLanes`·`RemoteLane`·`LaneSnapshot`, `AvatarBroadcaster`·`AvatarSnapshot`. 씬 재생성은 메뉴 `VRB > Build Network`(NGO 객체와 상대 레인·아바타 모형 전부).
 
 ### 학교에서 (Quest 3S 필요)
 
