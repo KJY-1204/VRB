@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 9050881862933345587}
   - component: {fileID: 1073936038086117192}
   - component: {fileID: 3973890651899083002}
+  - component: {fileID: 7599879419741814025}
   - component: {fileID: 6425214019500906336}
   - component: {fileID: 8357980484702010503}
   m_Layer: 0
@@ -46,8 +47,8 @@ Rigidbody:
   serializedVersion: 5
   m_Mass: 1.56
   m_LinearDamping: 0
-  m_AngularDamping: 0.25
-  m_CenterOfMass: {x: 0, y: 0.13, z: 0}
+  m_AngularDamping: 0.1
+  m_CenterOfMass: {x: 0, y: 0.146, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
   m_IncludeLayers:
@@ -75,6 +76,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f05bb747c93863846bcfb8f970bff3c5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: VRB.Runtime::VRB.Pin
+  m_LyingAngularDamping: 2
+--- !u!64 &7599879419741814025
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4480805173637889114}
+  m_Material: {fileID: 13400000, guid: e4765889243d2f242a7ed507a105442c, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 1
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 4300000, guid: e5d2261c97dbdad41a88bf3c5100db47, type: 2}
 --- !u!136 &6425214019500906336
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -94,10 +118,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.056
-  m_Height: 0.25
+  m_Radius: 0.0235
+  m_Height: 0.14
   m_Direction: 1
-  m_Center: {x: 0, y: 0.13, z: 0}
+  m_Center: {x: 0, y: 0.255, z: 0}
 --- !u!136 &8357980484702010503
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -117,10 +141,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.027
-  m_Height: 0.2
+  m_Radius: 0.031
+  m_Height: 0.085
   m_Direction: 1
-  m_Center: {x: 0, y: 0.28100002, z: 0}
+  m_Center: {x: 0, y: 0.33850002, z: 0}
 --- !u!1 &7564904430001223447
 GameObject:
   m_ObjectHideFlags: 0

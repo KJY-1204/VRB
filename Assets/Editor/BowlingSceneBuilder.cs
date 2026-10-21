@@ -73,34 +73,115 @@ namespace VRB.EditorTools
             AssetDatabase.SaveAssets();
         }
 
+        const string PinBodyMeshPath = PrefabDir + "/PinBody.asset";
+
+        // Silhouette of a regulation pin from its flat base up to where the neck begins: height and radius in inches.
+        // It is wide at 4.5 in (4.766 in across) and stands on a base 2 in across, so a pin rocks upright again after a
+        // small tilt (about 11 degrees) instead of toppling like a ball-bottomed capsule would.
+        static readonly float[,] PinBodyProfileInches =
+        {
+            { 0.00f, 1.00f }, { 0.15f, 1.13f }, { 1.00f, 1.60f }, { 2.00f, 2.05f }, { 3.00f, 2.30f },
+            { 4.50f, 2.383f }, { 6.00f, 2.25f }, { 7.00f, 1.95f }, { 8.00f, 1.55f }, { 8.70f, 1.25f },
+        };
+
+        /// <summary>A solid of revolution of <see cref="PinBodyProfileInches"/>, used as a convex collider.</summary>
+        static Mesh BuildPinBodyMesh()
+        {
+            const int segments = 20;
+            const float inch = 0.0254f;
+            var rings = PinBodyProfileInches.GetLength(0);
+            var vertices = new List<Vector3>();
+            for (var ring = 0; ring < rings; ring++)
+            {
+                var y = PinBodyProfileInches[ring, 0] * inch;
+                var radius = PinBodyProfileInches[ring, 1] * inch;
+                for (var i = 0; i < segments; i++)
+                {
+                    var angle = i * Mathf.PI * 2f / segments;
+                    vertices.Add(new Vector3(Mathf.Cos(angle) * radius, y, Mathf.Sin(angle) * radius));
+                }
+            }
+
+            var bottomCenter = vertices.Count;
+            vertices.Add(new Vector3(0f, PinBodyProfileInches[0, 0] * inch, 0f));
+            var topCenter = vertices.Count;
+            vertices.Add(new Vector3(0f, PinBodyProfileInches[rings - 1, 0] * inch, 0f));
+
+            var triangles = new List<int>();
+            for (var ring = 0; ring < rings - 1; ring++)
+            {
+                for (var i = 0; i < segments; i++)
+                {
+                    var next = (i + 1) % segments;
+                    int a = ring * segments + i, b = ring * segments + next;
+                    int c = (ring + 1) * segments + i, d = (ring + 1) * segments + next;
+                    triangles.AddRange(new[] { a, c, b, b, c, d });
+                }
+            }
+            for (var i = 0; i < segments; i++)
+            {
+                var next = (i + 1) % segments;
+                triangles.AddRange(new[] { bottomCenter, i, next });
+                triangles.AddRange(new[] { topCenter, (rings - 1) * segments + next, (rings - 1) * segments + i });
+            }
+
+            var mesh = new Mesh { name = "PinBody" };
+            mesh.SetVertices(vertices);
+            mesh.SetTriangles(triangles, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            // Overwrite in place so the pin prefab keeps its reference to this asset.
+            var saved = AssetDatabase.LoadAssetAtPath<Mesh>(PinBodyMeshPath);
+            if (saved != null)
+            {
+                EditorUtility.CopySerialized(mesh, saved);
+                Object.DestroyImmediate(mesh);
+            }
+            else
+            {
+                AssetDatabase.CreateAsset(mesh, PinBodyMeshPath);
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.ImportAsset(PinBodyMeshPath, ImportAssetOptions.ForceSynchronousImport);
+            return AssetDatabase.LoadAssetAtPath<Mesh>(PinBodyMeshPath);
+        }
+
         static void BuildPinPrefab()
         {
             var pin = new GameObject("Pin");
             var body = pin.AddComponent<Rigidbody>();
             pin.AddComponent<Pin>();
             body.mass = BowlingDimensions.PinMass;
-            body.centerOfMass = new Vector3(0f, 0.13f, 0f);
-            body.angularDamping = 0.25f; // lying pins wobble in place; damping makes them settle
+            body.centerOfMass = new Vector3(0f, BowlingDimensions.PinCenterOfMassHeight, 0f);
+            body.angularDamping = 0.1f; // lying pins wobble in place; Pin adds damping while they lie down
             body.linearDamping = 0f;
             body.sleepThreshold = 0.05f;
+            body.solverIterations = 16; // pins lean on each other, so contacts need a few more passes to stay stable
             body.collisionDetectionMode = CollisionDetectionMode.Discrete;
 
-            var material = GetOrCreatePhysicsMaterial("Pin", 0.35f, 0.3f, 0.15f);
+            var material = GetOrCreatePhysicsMaterial("Pin", 0.40f, 0.30f, 0.50f, PhysicsMaterialCombine.Average);
 
-            // Wide lower body and narrow neck/head, simple primitives instead of a convex mesh.
-            var lower = pin.AddComponent<CapsuleCollider>();
-            lower.direction = 1;
-            lower.radius = 0.056f;
-            lower.height = 0.25f;
-            lower.center = new Vector3(0f, 0.13f, 0f);
-            lower.sharedMaterial = material;
+            // The belly is the real silhouette with a flat base; the slim neck and the head are two capsules.
+            var belly = pin.AddComponent<MeshCollider>();
+            belly.convex = true;
+            belly.sharedMesh = BuildPinBodyMesh();
+            belly.sharedMaterial = material;
 
-            var upper = pin.AddComponent<CapsuleCollider>();
-            upper.direction = 1;
-            upper.radius = 0.027f;
-            upper.height = 0.2f;
-            upper.center = new Vector3(0f, BowlingDimensions.PinHeight - 0.1f, 0f);
-            upper.sharedMaterial = material;
+            var neck = pin.AddComponent<CapsuleCollider>();
+            neck.direction = 1;
+            neck.radius = 0.0235f;
+            neck.height = 0.14f;
+            neck.center = new Vector3(0f, 0.255f, 0f);
+            neck.sharedMaterial = material;
+
+            var head = pin.AddComponent<CapsuleCollider>();
+            head.direction = 1;
+            head.radius = 0.031f;
+            head.height = 0.085f;
+            head.center = new Vector3(0f, BowlingDimensions.PinHeight - 0.0425f, 0f);
+            head.sharedMaterial = material;
 
             AddVisual(pin.transform, "Bowling_pin001", FbxPinWidth, FbxPinHeight,
                 BowlingDimensions.PinMaxDiameter, BowlingDimensions.PinHeight);
@@ -124,7 +205,7 @@ namespace VRB.EditorTools
 
             var sphere = ball.AddComponent<SphereCollider>();
             sphere.radius = BowlingDimensions.BallDiameter / 2f;
-            sphere.sharedMaterial = GetOrCreatePhysicsMaterial("Ball", 0.3f, 0.2f, 0.05f);
+            sphere.sharedMaterial = GetOrCreatePhysicsMaterial("Ball", 0.3f, 0.2f, 0.60f, PhysicsMaterialCombine.Average);
 
             AddVisual(ball.transform, "Bowling_ball", FbxBallDiameter, FbxBallDiameter,
                 BowlingDimensions.BallDiameter, BowlingDimensions.BallDiameter);
@@ -200,7 +281,7 @@ namespace VRB.EditorTools
             var pit = GetOrCreateMaterial("Pit", new Color(0.03f, 0.03f, 0.04f), 0.05f);
             var line = GetOrCreateMaterial("FoulLine", new Color(0.9f, 0.1f, 0.1f), 0.2f);
 
-            var laneFriction = GetOrCreatePhysicsMaterial("Lane", 0.3f, 0.2f, 0.05f);
+            var laneFriction = GetOrCreatePhysicsMaterial("Lane", 0.3f, 0.2f, 0.15f);
             var gutterFriction = GetOrCreatePhysicsMaterial("Gutter", 0.5f, 0.4f, 0.05f);
             var solidFriction = GetOrCreatePhysicsMaterial("Solid", 0.5f, 0.4f, 0.1f);
 
@@ -1118,8 +1199,13 @@ namespace VRB.EditorTools
             return material;
         }
 
+        /// <summary>
+        /// Bounce between two surfaces uses the higher-priority mode of the two (Average, Minimum, Multiply, Maximum).
+        /// Floors and walls use Minimum, so nothing bounces much off them; pins and the ball use Average, so they spring
+        /// off each other the way the real hard-shelled ones do.
+        /// </summary>
         static PhysicsMaterial GetOrCreatePhysicsMaterial(string name, float staticFriction,
-            float dynamicFriction, float bounciness)
+            float dynamicFriction, float bounciness, PhysicsMaterialCombine bounceCombine = PhysicsMaterialCombine.Minimum)
         {
             var path = $"{MaterialDir}/{name}.physicMaterial";
             var material = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>(path);
@@ -1133,7 +1219,7 @@ namespace VRB.EditorTools
             material.dynamicFriction = dynamicFriction;
             material.bounciness = bounciness;
             material.frictionCombine = PhysicsMaterialCombine.Average;
-            material.bounceCombine = PhysicsMaterialCombine.Minimum;
+            material.bounceCombine = bounceCombine;
             EditorUtility.SetDirty(material);
             return material;
         }
