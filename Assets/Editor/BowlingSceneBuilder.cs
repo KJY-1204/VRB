@@ -270,6 +270,9 @@ namespace VRB.EditorTools
         const float FbxFoulLineX = -15.06f;
         const float FbxLaneCenterZ = -17.0f;
         const float FbxPinDeckEndX = 3.32f;
+        const float FbxTvFaceX = 3.33f;
+
+        static float HallStretch => (LaneEndZ + 0.15f) / (FbxPinDeckEndX - FbxFoulLineX);
 
         /// <summary>
         /// Saves the bowling club FBX as a prefab with all of its decoration. Only the loose pins and balls standing
@@ -304,7 +307,7 @@ namespace VRB.EditorTools
         {
             BuildHallPrefab();
 
-            var stretch = (LaneEndZ + 0.15f) / (FbxPinDeckEndX - FbxFoulLineX);
+            var stretch = HallStretch;
 
             foreach (var r in lane.GetComponentsInChildren<MeshRenderer>())
                 if (r.name != "Ceiling") r.enabled = false;
@@ -383,6 +386,7 @@ namespace VRB.EditorTools
         {
             DestroyIfExists("SelectionCanvas");
             DestroyIfExists("ScoreboardCanvas");
+            DestroyIfExists("TvCanvas");
             DestroyIfExists("EventSystem");
 
             var eventSystem = new GameObject("EventSystem");
@@ -391,6 +395,7 @@ namespace VRB.EditorTools
 
             BuildSelectionCanvas();
             BuildScoreboardCanvas();
+            BuildTvCanvas();
             EditorSceneManagerUtility.MarkDirty(SceneManager.GetActiveScene());
         }
 
@@ -527,6 +532,30 @@ namespace VRB.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        /// <summary>
+        /// Puts the score on the hall's TV over our lane's pins. The screen is 0.93 x 0.6 m and sits about 19 m from the
+        /// player, so only the big total is meant to be read from the throwing spot.
+        /// </summary>
+        static void BuildTvCanvas()
+        {
+            var z = (FbxTvFaceX - FbxFoulLineX) * HallStretch - 0.02f;
+            var canvas = CreateWorldCanvas("TvCanvas", new Vector2(930f, 600f), 0.001f, new Vector3(0f, 1.3f, z));
+            var view = canvas.AddComponent<TvScoreView>();
+            var root = canvas.transform;
+
+            MakeText(root, "TotalLabel", "TOTAL", 70f, new Vector2(0f, 235f), new Vector2(800f, 90f),
+                new Color(0.65f, 0.70f, 0.80f));
+            var total = MakeText(root, "Total", "0", 380f, new Vector2(0f, 10f), new Vector2(800f, 400f), Color.white, FontStyles.Bold);
+            var status = MakeText(root, "Status", string.Empty, 84f, new Vector2(0f, -235f), new Vector2(880f, 110f),
+                new Color(1f, 0.85f, 0.35f), FontStyles.Bold);
+            Object.DestroyImmediate(canvas.GetComponent<TrackedDeviceGraphicRaycaster>()); // display only
+
+            var so = new SerializedObject(view);
+            so.FindProperty("m_TotalText").objectReferenceValue = total;
+            so.FindProperty("m_StatusText").objectReferenceValue = status;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         [MenuItem("VRB/Build Game Controller")]
         public static void BuildGameController()
         {
@@ -543,6 +572,7 @@ namespace VRB.EditorTools
             SetReference(controller, "m_GrabFilter", ball.GetComponent<NearGrabFilter>());
             SetReference(controller, "m_SelectionView", GameObject.Find("SelectionCanvas").GetComponent<LevelSelectionView>());
             SetReference(controller, "m_Scoreboard", GameObject.Find("ScoreboardCanvas").GetComponent<ScoreboardView>());
+            SetReference(controller, "m_Tv", GameObject.Find("TvCanvas").GetComponent<TvScoreView>());
 
             game.SetActive(true);
             EditorSceneManagerUtility.MarkDirty(game.scene);

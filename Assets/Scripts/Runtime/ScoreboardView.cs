@@ -37,7 +37,7 @@ namespace VRB
             m_ThrowsText.text = session.ThrowCount.ToString();
         }
 
-        static string StatusFor(GamePhase phase, int lastPins)
+        public static string StatusFor(GamePhase phase, int lastPins)
         {
             switch (phase)
             {

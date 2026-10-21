@@ -16,6 +16,7 @@ namespace VRB
         [SerializeField] NearGrabFilter m_GrabFilter;
         [SerializeField] LevelSelectionView m_SelectionView;
         [SerializeField] ScoreboardView m_Scoreboard;
+        [SerializeField] TvScoreView m_Tv;
         [SerializeField] float m_ResultSeconds = 3f;
 
         ThrowWatcher m_Watcher;
@@ -132,6 +133,7 @@ namespace VRB
             m_SelectionView.SetVisible(selecting);
             m_Scoreboard.SetVisible(!selecting);
             m_Scoreboard.Refresh(Flow.Phase, Flow.Session, Flow.LastPinsFallen);
+            if (m_Tv != null) m_Tv.Refresh(Flow.Phase, Flow.Session, Flow.LastPinsFallen);
         }
     }
 }
