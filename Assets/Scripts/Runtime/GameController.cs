@@ -41,6 +41,7 @@ namespace VRB
             m_Rack.Judged += OnJudged;
             m_SelectionView.LevelPicked += OnLevelPicked;
             m_SelectionView.LanePicked += OnLanePicked;
+            m_SelectionView.PlayersPicked += OnPlayersPicked;
             m_SelectionView.StartPressed += OnStartPressed;
             m_Scoreboard.RestartPressed += Restart;
         }
@@ -53,6 +54,7 @@ namespace VRB
             m_Rack.Judged -= OnJudged;
             m_SelectionView.LevelPicked -= OnLevelPicked;
             m_SelectionView.LanePicked -= OnLanePicked;
+            m_SelectionView.PlayersPicked -= OnPlayersPicked;
             m_SelectionView.StartPressed -= OnStartPressed;
             m_Scoreboard.RestartPressed -= Restart;
         }
@@ -81,6 +83,14 @@ namespace VRB
         void OnLanePicked(int lane)
         {
             if (Flow.Phase == GamePhase.SelectingLevel && m_Lanes != null) m_Lanes.Select(lane);
+        }
+
+        void OnPlayersPicked(int count)
+        {
+            if (Flow.Phase != GamePhase.SelectingLevel) return;
+
+            Flow.SetPlayerCount(count);
+            ShowCurrentPhase();
         }
 
         void OnStartPressed()
@@ -146,8 +156,8 @@ namespace VRB
             var selecting = Flow.Phase == GamePhase.SelectingLevel;
             m_SelectionView.SetVisible(selecting);
             m_Scoreboard.SetVisible(!selecting);
-            m_Scoreboard.Refresh(Flow.Phase, Flow.Session);
-            if (m_Tv != null) m_Tv.Refresh(Flow.Phase, Flow.Session);
+            m_Scoreboard.Refresh(Flow.Phase, Flow.Match);
+            if (m_Tv != null) m_Tv.Refresh(Flow.Phase, Flow.Match);
         }
     }
 }

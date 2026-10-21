@@ -249,22 +249,22 @@ namespace VRB.Tests
         [UnityTest]
         public IEnumerator Scoreboard_ShowsStrikeAndTheBonusItEarns()
         {
-            var session = new GameSession();
-            session.RecordThrow(10);
-            m_Scoreboard.Refresh(GamePhase.ShowingResult, session);
+            var match = new Match();
+            match.RecordThrow(10);
+            m_Scoreboard.Refresh(GamePhase.ShowingResult, match);
             Assert.That(m_Scoreboard.StatusText, Does.Contain("STRIKE"));
             Assert.That(m_Scoreboard.FrameMarksText(1), Is.EqualTo("X"));
             Assert.That(m_Scoreboard.FrameScoreText(1), Is.Empty, "The strike's bonus balls have not been thrown yet.");
             Assert.That(m_Scoreboard.TotalText, Is.EqualTo("10"));
 
-            session.RecordThrow(0);
-            m_Scoreboard.Refresh(GamePhase.ShowingResult, session);
+            match.RecordThrow(0);
+            m_Scoreboard.Refresh(GamePhase.ShowingResult, match);
             Assert.That(m_Scoreboard.StatusText, Is.EqualTo("Miss"));
             Assert.That(m_Scoreboard.FrameMarksText(2), Is.EqualTo("-"));
             Assert.That(m_Scoreboard.FrameScoreText(1), Is.Empty);
 
-            session.RecordThrow(3);
-            m_Scoreboard.Refresh(GamePhase.ShowingResult, session);
+            match.RecordThrow(3);
+            m_Scoreboard.Refresh(GamePhase.ShowingResult, match);
             Assert.That(m_Scoreboard.StatusText, Is.EqualTo("3 pins down"));
             Assert.That(m_Scoreboard.FrameScoreText(1), Is.EqualTo("13"));
             Assert.That(m_Scoreboard.FrameScoreText(2), Is.EqualTo("16"));
@@ -275,11 +275,11 @@ namespace VRB.Tests
         [UnityTest]
         public IEnumerator Scoreboard_ShowsASpare()
         {
-            var session = new GameSession();
-            session.RecordThrow(7);
-            session.RecordThrow(3);
+            var match = new Match();
+            match.RecordThrow(7);
+            match.RecordThrow(3);
 
-            m_Scoreboard.Refresh(GamePhase.ShowingResult, session);
+            m_Scoreboard.Refresh(GamePhase.ShowingResult, match);
 
             Assert.That(m_Scoreboard.StatusText, Does.Contain("SPARE"));
             Assert.That(m_Scoreboard.FrameMarksText(1), Is.EqualTo("7 /"));
@@ -289,10 +289,10 @@ namespace VRB.Tests
         [UnityTest]
         public IEnumerator Scoreboard_ShowsThePerfectGameAtTheEnd()
         {
-            var session = new GameSession();
-            for (var i = 0; i < 12; i++) session.RecordThrow(10);
+            var match = new Match();
+            for (var i = 0; i < 12; i++) match.RecordThrow(10);
 
-            m_Scoreboard.Refresh(GamePhase.GameOver, session);
+            m_Scoreboard.Refresh(GamePhase.GameOver, match);
 
             Assert.That(m_Scoreboard.StatusText, Is.EqualTo("Game over - 300 points"));
             Assert.That(m_Scoreboard.TotalText, Is.EqualTo("300"));

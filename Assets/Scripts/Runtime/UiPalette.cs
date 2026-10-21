@@ -22,11 +22,12 @@ namespace VRB
         public static readonly Color Strike = new Color(1f, 0.38f, 0.66f, 1f);
 
         /// <summary>Amber for ordinary messages, hot pink for a strike and cyan for a spare.</summary>
-        public static Color StatusColor(GamePhase phase, GameSession session)
+        public static Color StatusColor(GamePhase phase, Match match)
         {
             if (phase != GamePhase.ShowingResult) return Amber;
 
-            var mark = session.Card.LastMark;
+            // The turn has not moved on yet, so the latest throw is the current player's.
+            var mark = (match.LastThrower ?? match.Current).Session.Card.LastMark;
             return mark == "X" ? Strike : mark == "/" ? Accent : Amber;
         }
     }
