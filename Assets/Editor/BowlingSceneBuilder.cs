@@ -270,10 +270,11 @@ namespace VRB.EditorTools
 
         const float FbxFoulLineX = -15.06f;
         const float FbxLaneCenterZ = -17.0f;
-        const float FbxPinDeckEndX = 3.32f;
+        const float FbxHeadPinX = 4.03f;
         const float FbxTvFaceX = 3.33f;
 
-        static float HallStretch => (LaneEndZ + 0.15f) / (FbxPinDeckEndX - FbxFoulLineX);
+        /// <summary>Scales the hall along the lane so the FBX's head pin spot lands on the game's head pin.</summary>
+        static float HallStretch => BowlingDimensions.LaneLength / (FbxHeadPinX - FbxFoulLineX);
 
         /// <summary>
         /// Saves the bowling club FBX as a prefab with all of its decoration. Only the loose pins and balls standing
@@ -298,6 +299,8 @@ namespace VRB.EditorTools
 
             PrefabUtility.SaveAsPrefabAsset(hall, HallPrefabPath);
             Object.DestroyImmediate(hall);
+            // Without this the next instantiation can see the prefab's new mesh reference as missing.
+            AssetDatabase.ImportAsset(HallPrefabPath, ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport);
         }
 
         // The hall's four lanes, as the z of each lane's center in the FBX. Only the second one has its masking unit
@@ -390,8 +393,21 @@ namespace VRB.EditorTools
             mesh.subMeshCount = submeshes.Count;
             for (var s = 0; s < submeshes.Count; s++) mesh.SetIndices(submeshes[s], MeshTopology.Triangles, s);
             mesh.RecalculateBounds();
-            AssetDatabase.DeleteAsset(HallMeshPath);
-            AssetDatabase.CreateAsset(mesh, HallMeshPath);
+            // Overwrite in place when it exists: deleting it would break the references the hall prefab holds.
+            var saved = AssetDatabase.LoadAssetAtPath<Mesh>(HallMeshPath);
+            if (saved != null)
+            {
+                EditorUtility.CopySerialized(mesh, saved);
+                Object.DestroyImmediate(mesh);
+                mesh = saved;
+            }
+            else
+            {
+                AssetDatabase.CreateAsset(mesh, HallMeshPath);
+            }
+            AssetDatabase.SaveAssets();
+            AssetDatabase.ImportAsset(HallMeshPath, ImportAssetOptions.ForceSynchronousImport);
+            mesh = AssetDatabase.LoadAssetAtPath<Mesh>(HallMeshPath);
             filter.sharedMesh = mesh;
 
             var openZ = FbxLaneCentersZ[FbxOpenLane];
@@ -413,7 +429,7 @@ namespace VRB.EditorTools
         /// <summary>
         /// Places the decorated hall around the physics lane. The FBX lanes run along its +X in meters, so the hall
         /// is turned onto +Z and shifted so that the 4th lane's foul line and center land on this lane's. The FBX pin
-        /// deck ends 18.4m past the foul line, the pins need 19.2m, so the hall is stretched along the lane to fit.
+        /// head pin stands 19.1m past the foul line, 0.8m too far, so the hall is shortened along the lane to fit.
         /// The hand-built boxes stay as colliders; only their renderers are hidden.
         /// </summary>
         static void BuildHallVisual(GameObject lane)
