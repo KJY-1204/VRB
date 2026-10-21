@@ -28,6 +28,9 @@ namespace VRB
         /// <summary>Raised when a new picture of another player's lane has arrived.</summary>
         public static event Action<NetPlayer> SnapshotReceived;
 
+        /// <summary>Raised when a new pose of another player's head and hands has arrived.</summary>
+        public static event Action<NetPlayer> PoseReceived;
+
         readonly NetworkVariable<FixedString32Bytes> m_Name = new NetworkVariable<FixedString32Bytes>(
             default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
@@ -76,6 +79,28 @@ namespace VRB
 
             SnapshotTime = Time.time;
             SnapshotReceived?.Invoke(this);
+        }
+
+        /// <summary>The latest pose of this player's head and hands, as received from their device.</summary>
+        public AvatarSnapshot Pose { get; } = new AvatarSnapshot();
+
+        /// <summary>When (<see cref="Time.time"/>) the last pose arrived; negative before the first.</summary>
+        public float PoseTime { get; private set; } = -1f;
+
+        /// <summary>Tell the other devices where this player's head and hands are (the owner only).</summary>
+        public void SendPose(AvatarSnapshot pose)
+        {
+            if (!IsOwner || !IsSpawned) return;
+            PoseRpc(pose.Positions, pose.Rotations);
+        }
+
+        [Rpc(SendTo.NotOwner, Delivery = RpcDelivery.Unreliable)]
+        void PoseRpc(Vector3[] positions, Quaternion[] rotations)
+        {
+            if (!Pose.TrySet(positions, rotations)) return;
+
+            PoseTime = Time.time;
+            PoseReceived?.Invoke(this);
         }
 
         void Awake()

@@ -1249,7 +1249,29 @@ namespace VRB.EditorTools
                 var array = fields.FindProperty("m_Bodies");
                 array.arraySize = bodies.Length;
                 for (var b = 0; b < bodies.Length; b++) array.GetArrayElementAtIndex(b).objectReferenceValue = bodies[b];
+
+                // The player on that lane: a head with a visor, and a ball for each hand.
+                var avatarMaterial = GetOrCreateMaterial("Avatar", new Color(0.55f, 0.75f, 0.95f), 0.4f);
+                var parts = new[]
+                {
+                    MakeAvatarPart(laneObject.transform, "Head", 0.2f, avatarMaterial),
+                    MakeAvatarPart(laneObject.transform, "LeftHand", 0.09f, avatarMaterial),
+                    MakeAvatarPart(laneObject.transform, "RightHand", 0.09f, avatarMaterial),
+                };
+                var visor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                visor.name = "Visor";
+                Object.DestroyImmediate(visor.GetComponent<Collider>());
+                visor.transform.SetParent(parts[0], false);
+                visor.transform.localPosition = new Vector3(0f, 0.01f, 0.08f);
+                visor.transform.localScale = new Vector3(0.19f, 0.08f, 0.06f);
+                visor.GetComponent<MeshRenderer>().sharedMaterial =
+                    GetOrCreateMaterial("AvatarVisor", new Color(0.08f, 0.09f, 0.12f), 0.8f);
+
+                var partArray = fields.FindProperty("m_AvatarParts");
+                partArray.arraySize = parts.Length;
+                for (var p = 0; p < parts.Length; p++) partArray.GetArrayElementAtIndex(p).objectReferenceValue = parts[p];
                 fields.ApplyModifiedPropertiesWithoutUndo();
+                foreach (var part in parts) part.gameObject.SetActive(false);
 
                 remoteLanes[i] = remote;
                 laneObject.SetActive(false);
@@ -1268,6 +1290,28 @@ namespace VRB.EditorTools
             broadcasterFields.FindProperty("m_Rack").objectReferenceValue = GameObject.Find("Pins").GetComponent<PinRack>();
             broadcasterFields.FindProperty("m_Ball").objectReferenceValue = GameObject.Find("Ball").transform;
             broadcasterFields.ApplyModifiedPropertiesWithoutUndo();
+
+            var rig = GameObject.Find("XR Origin (XR Rig)");
+            if (rig == null) return;
+
+            var head = rig.GetComponentsInChildren<Camera>(true).First(c => c.GetComponent<MirrorView>() == null && c.name != "MirrorCamera");
+            var avatar = bridge.gameObject.AddComponent<AvatarBroadcaster>();
+            var avatarFields = new SerializedObject(avatar);
+            avatarFields.FindProperty("m_Head").objectReferenceValue = head.transform;
+            avatarFields.FindProperty("m_LeftHand").objectReferenceValue = rig.transform.Find("Camera Offset/Left Controller");
+            avatarFields.FindProperty("m_RightHand").objectReferenceValue = rig.transform.Find("Camera Offset/Right Controller");
+            avatarFields.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static Transform MakeAvatarPart(Transform parent, string name, float diameter, Material material)
+        {
+            var part = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            part.name = name;
+            Object.DestroyImmediate(part.GetComponent<Collider>());
+            part.transform.SetParent(parent, false);
+            part.transform.localScale = Vector3.one * diameter;
+            part.GetComponent<MeshRenderer>().sharedMaterial = material;
+            return part.transform;
         }
 
         /// <summary>

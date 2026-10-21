@@ -180,6 +180,31 @@ namespace VRB.Tests
         }
 
         [UnityTest]
+        public IEnumerator APoseOfTheHeadAndHands_ReachesTheOtherDevice()
+        {
+            yield return HostAndJoin();
+            var clientPlayer = PlayerOn(m_Client, m_Client.LocalClientId);
+            var onHost = PlayerOn(m_Host, m_Client.LocalClientId);
+
+            var pose = new AvatarSnapshot();
+            for (var i = 0; i < AvatarSnapshot.PartCount; i++)
+            {
+                pose.Positions[i] = new Vector3(i, 1.2f, -1.6f);
+                pose.Rotations[i] = Quaternion.identity;
+            }
+
+            for (var attempt = 0; attempt < 20 && onHost.PoseTime < 0f; attempt++)
+            {
+                clientPlayer.SendPose(pose);
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            Assert.That(onHost.PoseTime, Is.GreaterThanOrEqualTo(0f), "The pose should arrive.");
+            Assert.That(onHost.Pose.Positions[AvatarSnapshot.RightHand].x, Is.EqualTo(2f).Within(0.001f));
+            Assert.That(clientPlayer.PoseTime, Is.LessThan(0f), "The sender does not get its own pose back.");
+        }
+
+        [UnityTest]
         public IEnumerator ANewGame_EmptiesTheThrowsOnTheOtherDevice()
         {
             yield return HostAndJoin();

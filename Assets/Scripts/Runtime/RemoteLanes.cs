@@ -18,6 +18,7 @@ namespace VRB
         {
             NetPlayer.Changed += Refresh;
             NetPlayer.SnapshotReceived += OnSnapshot;
+            NetPlayer.PoseReceived += OnPose;
             m_Lanes.LaneChanged += OnLaneChanged;
         }
 
@@ -25,6 +26,7 @@ namespace VRB
         {
             NetPlayer.Changed -= Refresh;
             NetPlayer.SnapshotReceived -= OnSnapshot;
+            NetPlayer.PoseReceived -= OnPose;
             m_Lanes.LaneChanged -= OnLaneChanged;
         }
 
@@ -44,7 +46,22 @@ namespace VRB
                 m_RemoteLanes[lane].SetSideways(m_Lanes.SidewaysFromPlayed(lane));
                 m_RemoteLanes[lane].Show(show);
                 if (show && player.SnapshotTime >= 0f) m_RemoteLanes[lane].SetTarget(player.Snapshot);
+                if (show && player.PoseTime >= 0f) m_RemoteLanes[lane].SetPose(player.Pose);
             }
+        }
+
+        void OnPose(NetPlayer player)
+        {
+            var lane = player.Lane;
+            if (lane < 0 || lane >= m_RemoteLanes.Length || !m_RemoteLanes[lane].IsShown) return;
+
+            m_RemoteLanes[lane].SetPose(player.Pose);
+        }
+
+        /// <summary>Draw the player of a lane as if their device had just reported this pose (used by tests).</summary>
+        public void ApplyPose(int lane, AvatarSnapshot pose)
+        {
+            m_RemoteLanes[lane].SetPose(pose, jump: true);
         }
 
         void OnSnapshot(NetPlayer player)
