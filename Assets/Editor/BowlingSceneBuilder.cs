@@ -56,6 +56,7 @@ namespace VRB.EditorTools
             BuildGameController();
             ConfigureRig();
             BuildSeat();
+            BuildMirror();
             ConfigureLighting();
         }
 
@@ -840,6 +841,89 @@ namespace VRB.EditorTools
             selectorFields.ApplyModifiedPropertiesWithoutUndo();
             selector.Select(0);
             EditorSceneManagerUtility.MarkDirty(hall.scene);
+        }
+
+        const string MirrorTexturePath = MaterialDir + "/MirrorView.renderTexture";
+
+        /// <summary>
+        /// A small screen at the edge of the player's view showing the pins and the TV score together, filmed from above
+        /// the lane about 7 m before the pins. At 19 m the TV and the pins are hard to read, and the board in front of
+        /// the player can be hidden by the ball or the hand.
+        /// </summary>
+        [MenuItem("VRB/Build Mirror")]
+        public static void BuildMirror()
+        {
+            DestroyIfExists("MirrorCamera");
+            DestroyIfExists("MirrorPanel");
+            var rig = GameObject.Find("XR Origin (XR Rig)");
+            var game = GameObject.Find("Game");
+            if (rig == null || game == null) return;
+
+            EnsureFolder("Assets/VRB", "Materials");
+            var texture = AssetDatabase.LoadAssetAtPath<RenderTexture>(MirrorTexturePath);
+            if (texture == null)
+            {
+                texture = new RenderTexture(768, 432, 24) { name = "MirrorView", antiAliasing = 1 };
+                AssetDatabase.CreateAsset(texture, MirrorTexturePath);
+            }
+
+            var cameraObject = new GameObject("MirrorCamera");
+            var position = new Vector3(0f, 0.95f, BowlingDimensions.LaneLength - 6.8f);
+            cameraObject.transform.position = position;
+            cameraObject.transform.rotation = Quaternion.LookRotation(
+                new Vector3(0f, 0.85f, BowlingDimensions.LaneLength + 0.4f) - position);
+            var camera = cameraObject.AddComponent<Camera>();
+            camera.fieldOfView = 18f;
+            camera.nearClipPlane = 0.3f;
+            camera.farClipPlane = 30f;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.05f, 0.05f, 0.07f);
+            camera.targetTexture = texture;
+            camera.stereoTargetEye = StereoTargetEyeMask.None;
+            var cameraData = cameraObject.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
+            cameraData.renderPostProcessing = false;
+            cameraData.renderShadows = false;
+            cameraData.antialiasing = UnityEngine.Rendering.Universal.AntialiasingMode.None;
+
+            var view = cameraObject.AddComponent<MirrorView>();
+            var viewFields = new SerializedObject(view);
+            viewFields.FindProperty("m_Camera").objectReferenceValue = camera;
+            viewFields.FindProperty("m_Game").objectReferenceValue = game.GetComponent<GameController>();
+            viewFields.ApplyModifiedPropertiesWithoutUndo();
+
+            var material = AssetDatabase.LoadAssetAtPath<Material>(MaterialDir + "/MirrorScreen.mat");
+            if (material == null)
+            {
+                material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+                AssetDatabase.CreateAsset(material, MaterialDir + "/MirrorScreen.mat");
+            }
+            material.SetTexture("_BaseMap", texture);
+            material.SetColor("_BaseColor", Color.white);
+            EditorUtility.SetDirty(material);
+
+            var panel = new GameObject("MirrorPanel");
+            var follow = panel.AddComponent<PeripheralFollow>();
+            var followFields = new SerializedObject(follow);
+            followFields.FindProperty("m_Head").objectReferenceValue = rig.GetComponentInChildren<Camera>();
+            followFields.ApplyModifiedPropertiesWithoutUndo();
+
+            var frame = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            frame.name = "Frame";
+            frame.transform.SetParent(panel.transform, false);
+            frame.transform.localScale = new Vector3(0.50f, 0.29f, 1f);
+            frame.transform.localPosition = new Vector3(0f, 0f, 0.002f);
+            frame.GetComponent<MeshRenderer>().sharedMaterial = GetOrCreateMaterial("MirrorFrame", new Color(0.04f, 0.04f, 0.06f), 0.1f);
+            Object.DestroyImmediate(frame.GetComponent<Collider>());
+
+            var screen = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            screen.name = "Screen";
+            screen.transform.SetParent(panel.transform, false);
+            screen.transform.localScale = new Vector3(0.48f, 0.27f, 1f);
+            screen.GetComponent<MeshRenderer>().sharedMaterial = material;
+            Object.DestroyImmediate(screen.GetComponent<Collider>());
+
+            AssetDatabase.SaveAssets();
+            EditorSceneManagerUtility.MarkDirty(panel.scene);
         }
 
         // ---------------------------------------------------------------- helpers
