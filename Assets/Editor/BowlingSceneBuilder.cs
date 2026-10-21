@@ -834,42 +834,65 @@ namespace VRB.EditorTools
 
         static void BuildScoreboardCanvas()
         {
-            // 1120 x 640 units at 0.9 mm per unit = 1.0 m x 0.58 m, about 0.85 m to the player's left, hung just off the
+            // 1500 x 720 units at 0.9 mm per unit = 1.35 m x 0.65 m, about 0.85 m to the player's left, hung just off the
             // hall's left wall, whose face is 0.96 m from the lane center at this height. Turn the head left to read it.
             // It is only turned 8 degrees toward the player: turning it fully would swing one end into the wall. Picking
-            // another lane slides the hall to the left, so the wall is only ever farther from it. Low enough not to overlap
-            // the mirror screen above.
+            // another lane slides the hall to the left, so the wall is only ever farther from it. Low enough not to
+            // overlap the mirror screen above.
             var position = new Vector3(-0.84f, 1.15f, -0.9f);
-            var canvas = CreateWorldCanvas("ScoreboardCanvas", new Vector2(1120f, 640f), 0.0009f, position);
+            var canvas = CreateWorldCanvas("ScoreboardCanvas", new Vector2(1500f, 720f), 0.0009f, position);
             canvas.transform.rotation = Quaternion.Euler(0f, 270f + 8f, 0f);
             var view = canvas.AddComponent<ScoreboardView>();
             var root = canvas.transform;
 
-            MakeCard(root, "StatusPill", UiPalette.Card, new Vector2(0f, 235f), new Vector2(900f, 130f), 60f);
-            var status = MakeText(root, "Status", string.Empty, 76f, new Vector2(0f, 235f), new Vector2(860f, 120f),
+            MakeCard(root, "StatusPill", UiPalette.Card, new Vector2(0f, 290f), new Vector2(1000f, 120f), 56f);
+            var status = MakeText(root, "Status", string.Empty, 72f, new Vector2(0f, 290f), new Vector2(960f, 110f),
                 UiPalette.Amber, FontStyles.Bold, 2f);
 
-            var columns = new[] { "LAST", "TOTAL", "THROWS" };
-            var xs = new[] { -365f, 0f, 365f };
-            var values = new TextMeshProUGUI[3];
-            for (var i = 0; i < 3; i++)
+            // Ten frame cells: number on top, the marks of each ball, then the running score. The tenth is wider since it
+            // can hold three balls.
+            const float cellWidth = 118f, lastCellWidth = 176f, gap = 10f, rowY = 55f;
+            var rowWidth = (Scorecard.FrameCount - 1) * (cellWidth + gap) + lastCellWidth;
+            var marks = new TextMeshProUGUI[Scorecard.FrameCount];
+            var scores = new TextMeshProUGUI[Scorecard.FrameCount];
+            var cards = new Image[Scorecard.FrameCount];
+            var left = -rowWidth / 2f;
+            for (var i = 0; i < Scorecard.FrameCount; i++)
             {
-                var total = i == 1;
-                var card = MakeCard(root, columns[i] + "Card", UiPalette.Card, new Vector2(xs[i], -5f), new Vector2(330f, 290f), 44f);
-                if (total) card.color = UiPalette.CardHighlight;
-                MakeText(root, columns[i] + "Label", columns[i], 44f, new Vector2(xs[i], 105f), new Vector2(320f, 60f),
-                    total ? UiPalette.Accent : UiPalette.Muted, FontStyles.Bold, 8f);
-                values[i] = MakeText(root, columns[i] + "Value", "0", total ? 230f : 190f, new Vector2(xs[i], -25f), new Vector2(320f, 240f),
-                    Color.white, FontStyles.Bold);
+                var width = i == Scorecard.FrameCount - 1 ? lastCellWidth : cellWidth;
+                var x = left + width / 2f;
+                left += width + gap;
+
+                cards[i] = MakeCard(root, "Frame" + (i + 1) + "Card", UiPalette.Card, new Vector2(x, rowY), new Vector2(width, 300f), 24f);
+                MakeText(root, "Frame" + (i + 1) + "Number", (i + 1).ToString(), 36f, new Vector2(x, rowY + 118f),
+                    new Vector2(width, 50f), UiPalette.Muted, FontStyles.Bold, 2f);
+                marks[i] = MakeText(root, "Frame" + (i + 1) + "Marks", string.Empty, 50f, new Vector2(x, rowY + 35f),
+                    new Vector2(width, 80f), Color.white, FontStyles.Bold, 4f);
+                scores[i] = MakeText(root, "Frame" + (i + 1) + "Score", string.Empty, 64f, new Vector2(x, rowY - 80f),
+                    new Vector2(width, 90f), UiPalette.Accent, FontStyles.Bold);
             }
 
-            var restart = MakeButton(root, "RestartButton", "RESTART", new Vector2(0f, -245f), new Vector2(380f, 96f), 50f);
+            MakeCard(root, "TotalCard", UiPalette.CardHighlight, new Vector2(-250f, -225f), new Vector2(560f, 190f), 48f);
+            MakeText(root, "TotalLabel", "TOTAL", 46f, new Vector2(-405f, -225f), new Vector2(220f, 70f),
+                UiPalette.Accent, FontStyles.Bold, 8f);
+            var total = MakeText(root, "TotalValue", "0", 150f, new Vector2(-150f, -225f), new Vector2(300f, 180f),
+                Color.white, FontStyles.Bold);
+
+            var restart = MakeButton(root, "RestartButton", "RESTART", new Vector2(360f, -225f), new Vector2(400f, 110f), 52f);
 
             var so = new SerializedObject(view);
             so.FindProperty("m_StatusText").objectReferenceValue = status;
-            so.FindProperty("m_LastText").objectReferenceValue = values[0];
-            so.FindProperty("m_TotalText").objectReferenceValue = values[1];
-            so.FindProperty("m_ThrowsText").objectReferenceValue = values[2];
+            so.FindProperty("m_TotalText").objectReferenceValue = total;
+            var marksArray = so.FindProperty("m_FrameMarks");
+            var scoresArray = so.FindProperty("m_FrameScores");
+            var cardsArray = so.FindProperty("m_FrameCards");
+            marksArray.arraySize = scoresArray.arraySize = cardsArray.arraySize = Scorecard.FrameCount;
+            for (var i = 0; i < Scorecard.FrameCount; i++)
+            {
+                marksArray.GetArrayElementAtIndex(i).objectReferenceValue = marks[i];
+                scoresArray.GetArrayElementAtIndex(i).objectReferenceValue = scores[i];
+                cardsArray.GetArrayElementAtIndex(i).objectReferenceValue = cards[i];
+            }
             so.FindProperty("m_RestartButton").objectReferenceValue = restart;
             so.ApplyModifiedPropertiesWithoutUndo();
         }

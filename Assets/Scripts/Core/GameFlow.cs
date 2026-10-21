@@ -10,11 +10,13 @@ namespace VRB.Core
         Settling,
         ShowingResult,
         Resetting,
+        GameOver,
     }
 
     /// <summary>
-    /// Turn flow of one game: select level, then repeat ready -> throw -> settle -> show result -> reset.
-    /// Pure logic; the scene drives it by reporting what happened (ball released, pins settled, ...).
+    /// Turn flow of one game: select level, then repeat ready -> throw -> settle -> show result -> reset, until the
+    /// tenth frame is done and the game is over. Pure logic; the scene drives it by reporting what happened (ball
+    /// released, pins settled, ...).
     /// </summary>
     public sealed class GameFlow
     {
@@ -73,11 +75,20 @@ namespace VRB.Core
             SetPhase(GamePhase.ShowingResult);
         }
 
-        /// <summary>The result has been on screen long enough; reset pins and ball.</summary>
+        /// <summary>
+        /// True when the pins about to be reset should all be set up again (a new frame, or a fresh rack in the tenth);
+        /// false when the standing ones stay and only the fallen are cleared (second ball of a frame).
+        /// </summary>
+        public bool NeedsFreshRack => Session.PinsStanding == GameSession.PinCount;
+
+        /// <summary>
+        /// The result has been on screen long enough. Goes on to reset pins and ball, or, if that was the last throw of
+        /// the game, to the game-over screen.
+        /// </summary>
         public void ResultShown()
         {
             Require(GamePhase.ShowingResult, nameof(ResultShown));
-            SetPhase(GamePhase.Resetting);
+            SetPhase(Session.IsComplete ? GamePhase.GameOver : GamePhase.Resetting);
         }
 
         /// <summary>Pins and ball are back in place; the next throw may start.</summary>

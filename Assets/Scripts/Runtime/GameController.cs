@@ -112,10 +112,16 @@ namespace VRB
             yield return new WaitForSeconds(m_ResultSeconds);
 
             Flow.ResultShown();
-            m_Rack.ResetAll();
+            m_ResultRoutine = null;
+            if (Flow.Phase == GamePhase.GameOver) yield break; // the last throw: leave the pins and the final score as they are
+
+            // A new frame (or a fresh rack in the tenth) gets all ten pins; between two balls of a frame the pinsetter
+            // only sweeps away the fallen ones and sets the standing ones back up.
+            if (Flow.NeedsFreshRack) m_Rack.ResetAll();
+            else m_Rack.ClearFallenAndRespot();
+
             m_Respawner.ReturnToStand();
             Flow.ResetComplete();
-            m_ResultRoutine = null;
         }
 
         /// <summary>Clear the record and return to level selection.</summary>
@@ -140,8 +146,8 @@ namespace VRB
             var selecting = Flow.Phase == GamePhase.SelectingLevel;
             m_SelectionView.SetVisible(selecting);
             m_Scoreboard.SetVisible(!selecting);
-            m_Scoreboard.Refresh(Flow.Phase, Flow.Session, Flow.LastPinsFallen);
-            if (m_Tv != null) m_Tv.Refresh(Flow.Phase, Flow.Session, Flow.LastPinsFallen);
+            m_Scoreboard.Refresh(Flow.Phase, Flow.Session);
+            if (m_Tv != null) m_Tv.Refresh(Flow.Phase, Flow.Session);
         }
     }
 }

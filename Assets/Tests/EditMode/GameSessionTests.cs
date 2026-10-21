@@ -34,6 +34,30 @@ namespace VRB.Tests
         }
 
         [Test]
+        public void TheScore_FollowsTheScoringRules()
+        {
+            var session = new GameSession();
+
+            session.RecordThrow(10);
+            session.RecordThrow(7);
+            session.RecordThrow(3);
+
+            Assert.That(session.Score, Is.EqualTo(30), "X counts 10 + 7 + 3 = 20, and the 7/ frame counts 10 so far.");
+            Assert.That(session.TotalPins, Is.EqualTo(20));
+        }
+
+        [Test]
+        public void ASecondThrow_CannotKnockDownMoreThanWasLeft()
+        {
+            var session = new GameSession();
+            session.RecordThrow(7);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => session.RecordThrow(4));
+            Assert.That(session.ThrowCount, Is.EqualTo(1));
+            Assert.That(session.TotalPins, Is.EqualTo(7));
+        }
+
+        [Test]
         public void Reset_ClearsHistoryAndTotal()
         {
             var session = new GameSession();
@@ -74,7 +98,7 @@ namespace VRB.Tests
             var a = new GameSession();
             var b = new GameSession();
 
-            foreach (var pins in new[] { 3, 9, 0, 10 })
+            foreach (var pins in new[] { 3, 6, 0, 10 })
             {
                 a.RecordThrow(pins);
                 b.RecordThrow(pins);
@@ -82,6 +106,7 @@ namespace VRB.Tests
 
             Assert.That(a.TotalPins, Is.EqualTo(b.TotalPins));
             Assert.That(a.ThrowCount, Is.EqualTo(b.ThrowCount));
+            Assert.That(a.Score, Is.EqualTo(b.Score));
         }
     }
 }

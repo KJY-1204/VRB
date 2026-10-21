@@ -175,18 +175,48 @@ namespace VRB.Tests
             yield return WaitForPhase(GamePhase.ShowingResult, 40f);
 
             var pins = m_Game.Flow.LastPinsFallen;
-            Assert.That(m_Scoreboard.LastText, Is.EqualTo(pins.ToString()));
             Assert.That(m_Scoreboard.TotalText, Is.EqualTo(pins.ToString()));
-            Assert.That(m_Scoreboard.ThrowsText, Is.EqualTo("1"));
+            Assert.That(m_Scoreboard.FrameMarksText(1), Is.EqualTo(pins == 10 ? "X" : pins.ToString()));
             Assert.That(m_Scoreboard.StatusText, Does.Contain(pins == 10 ? "STRIKE" : pins + " pins"));
             Assert.That(pins, Is.GreaterThan(0), "A straight 7 m/s throw down the center should hit the pins.");
 
             yield return WaitForPhase(GamePhase.Ready, 10f);
 
-            Assert.That(m_Rack.CountFallen(), Is.EqualTo(0), "All ten pins are back after the result.");
+            // The pins left standing stay for the second ball; the ones that fell have been swept away.
+            Assert.That(m_Rack.CountFallen(), Is.EqualTo(0));
+            Assert.That(m_Rack.ActiveCount, Is.EqualTo(pins == 10 ? 10 : 10 - pins));
             Assert.That(Vector3.Distance(m_Body.position, m_StandPosition), Is.LessThan(0.1f), "A fresh ball is on the stand.");
             m_Hand.transform.position = m_StandPosition;
             Assert.That(CanGrab(), Is.True, "The ball can be grabbed again for the next throw.");
+        }
+
+        [UnityTest]
+        public IEnumerator TwoBalls_MakeAFrame_ThenTheNextFrameGetsAFreshRack()
+        {
+            PressStart();
+            yield return null;
+
+            yield return ThrowDownTheLane();
+            yield return WaitForPhase(GamePhase.ShowingResult, 40f);
+            var first = m_Game.Flow.LastPinsFallen;
+            Assert.That(first, Is.InRange(1, 9), "A straight throw leaves some pins up, so there is a second ball.");
+            yield return WaitForPhase(GamePhase.Ready, 10f);
+            Assert.That(m_Game.Flow.Session.Card.CurrentFrame, Is.EqualTo(1));
+            Assert.That(m_Game.Flow.Session.Card.NextThrowInFrame, Is.EqualTo(2));
+            Assert.That(m_Scoreboard.StatusText, Is.EqualTo("Frame 1 - Ball 2"));
+
+            m_Hand.transform.position = m_StandPosition; // the hand is back at the ball stand for the second ball
+            yield return ThrowDownTheLane();
+            yield return WaitForPhase(GamePhase.ShowingResult, 40f);
+            var second = m_Game.Flow.LastPinsFallen;
+            Assert.That(second, Is.LessThanOrEqualTo(10 - first), "Only the standing pins can fall on the second ball.");
+            Assert.That(m_Game.Flow.Session.Card.Frames[0].Throws.Count, Is.EqualTo(2));
+            yield return WaitForPhase(GamePhase.Ready, 10f);
+
+            Assert.That(m_Game.Flow.Session.Card.CurrentFrame, Is.EqualTo(2));
+            Assert.That(m_Rack.ActiveCount, Is.EqualTo(10), "A new frame starts with all ten pins.");
+            Assert.That(m_Rack.CountFallen(), Is.EqualTo(0));
+            Assert.That(m_Scoreboard.StatusText, Is.EqualTo("Frame 2 - Ball 1"));
         }
 
         [UnityTest]
@@ -208,6 +238,7 @@ namespace VRB.Tests
             Assert.That(m_Selection.gameObject.activeSelf, Is.True);
             Assert.That(m_Scoreboard.gameObject.activeSelf, Is.False);
             Assert.That(m_Rack.CountFallen(), Is.EqualTo(0));
+            Assert.That(m_Rack.ActiveCount, Is.EqualTo(10), "Pins swept away in the old game are back.");
 
             // A different level can be chosen for the new game.
             m_Selection.Pick(ThrowAssistLevel.RawPhysics);
@@ -216,18 +247,58 @@ namespace VRB.Tests
         }
 
         [UnityTest]
-        public IEnumerator Scoreboard_ShowsStrikeWhenAllTenFall_AndZeroForAMiss()
+        public IEnumerator Scoreboard_ShowsStrikeAndTheBonusItEarns()
         {
             var session = new GameSession();
             session.RecordThrow(10);
-            m_Scoreboard.Refresh(GamePhase.ShowingResult, session, 10);
+            m_Scoreboard.Refresh(GamePhase.ShowingResult, session);
             Assert.That(m_Scoreboard.StatusText, Does.Contain("STRIKE"));
+            Assert.That(m_Scoreboard.FrameMarksText(1), Is.EqualTo("X"));
+            Assert.That(m_Scoreboard.FrameScoreText(1), Is.Empty, "The strike's bonus balls have not been thrown yet.");
+            Assert.That(m_Scoreboard.TotalText, Is.EqualTo("10"));
 
             session.RecordThrow(0);
-            m_Scoreboard.Refresh(GamePhase.ShowingResult, session, 0);
-            Assert.That(m_Scoreboard.LastText, Is.EqualTo("0"));
-            Assert.That(m_Scoreboard.TotalText, Is.EqualTo("10"));
-            Assert.That(m_Scoreboard.ThrowsText, Is.EqualTo("2"));
+            m_Scoreboard.Refresh(GamePhase.ShowingResult, session);
+            Assert.That(m_Scoreboard.StatusText, Is.EqualTo("Miss"));
+            Assert.That(m_Scoreboard.FrameMarksText(2), Is.EqualTo("-"));
+            Assert.That(m_Scoreboard.FrameScoreText(1), Is.Empty);
+
+            session.RecordThrow(3);
+            m_Scoreboard.Refresh(GamePhase.ShowingResult, session);
+            Assert.That(m_Scoreboard.StatusText, Is.EqualTo("3 pins down"));
+            Assert.That(m_Scoreboard.FrameScoreText(1), Is.EqualTo("13"));
+            Assert.That(m_Scoreboard.FrameScoreText(2), Is.EqualTo("16"));
+            Assert.That(m_Scoreboard.TotalText, Is.EqualTo("16"));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator Scoreboard_ShowsASpare()
+        {
+            var session = new GameSession();
+            session.RecordThrow(7);
+            session.RecordThrow(3);
+
+            m_Scoreboard.Refresh(GamePhase.ShowingResult, session);
+
+            Assert.That(m_Scoreboard.StatusText, Does.Contain("SPARE"));
+            Assert.That(m_Scoreboard.FrameMarksText(1), Is.EqualTo("7 /"));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator Scoreboard_ShowsThePerfectGameAtTheEnd()
+        {
+            var session = new GameSession();
+            for (var i = 0; i < 12; i++) session.RecordThrow(10);
+
+            m_Scoreboard.Refresh(GamePhase.GameOver, session);
+
+            Assert.That(m_Scoreboard.StatusText, Is.EqualTo("Game over - 300 points"));
+            Assert.That(m_Scoreboard.TotalText, Is.EqualTo("300"));
+            Assert.That(m_Scoreboard.FrameMarksText(10), Is.EqualTo("X X X"));
+            Assert.That(m_Scoreboard.FrameScoreText(10), Is.EqualTo("300"));
+            Assert.That(m_Scoreboard.FrameScoreText(1), Is.EqualTo("30"));
             yield return null;
         }
     }

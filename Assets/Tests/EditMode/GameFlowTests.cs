@@ -121,6 +121,97 @@ namespace VRB.Tests
             Assert.That(flow.Session.TotalPins, Is.EqualTo(17));
         }
 
+        static void Throw(GameFlow flow, int pins)
+        {
+            flow.BallReleased();
+            flow.ThrowReachedPins();
+            flow.PinsSettled(pins);
+            flow.ResultShown();
+            if (flow.Phase == GamePhase.Resetting) flow.ResetComplete();
+        }
+
+        [Test]
+        public void AfterTheFirstBallOfAFrame_TheStandingPinsStay()
+        {
+            var flow = new GameFlow();
+            flow.ConfirmSelection();
+
+            Throw(flow, 7);
+
+            Assert.That(flow.Phase, Is.EqualTo(GamePhase.Ready));
+            Assert.That(flow.Session.PinsStanding, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void AfterAStrikeOrTheSecondBall_TheRackIsSetUpAgain()
+        {
+            var flow = new GameFlow();
+            flow.ConfirmSelection();
+            flow.BallReleased();
+            flow.ThrowReachedPins();
+            flow.PinsSettled(10);
+            flow.ResultShown();
+            Assert.That(flow.NeedsFreshRack, Is.True, "Strike.");
+            flow.ResetComplete();
+
+            flow.BallReleased();
+            flow.ThrowReachedPins();
+            flow.PinsSettled(7);
+            flow.ResultShown();
+            Assert.That(flow.NeedsFreshRack, Is.False, "First ball left three standing.");
+            flow.ResetComplete();
+
+            flow.BallReleased();
+            flow.ThrowReachedPins();
+            flow.PinsSettled(2);
+            flow.ResultShown();
+            Assert.That(flow.NeedsFreshRack, Is.True, "Second ball ends the frame.");
+        }
+
+        [Test]
+        public void AfterTheLastThrow_TheGameIsOver()
+        {
+            var flow = new GameFlow();
+            flow.ConfirmSelection();
+
+            for (var i = 0; i < 20; i++) Throw(flow, 0);
+
+            Assert.That(flow.Phase, Is.EqualTo(GamePhase.GameOver));
+            Assert.That(flow.Session.IsComplete, Is.True);
+            Assert.That(flow.CanThrow, Is.False);
+            Assert.Throws<InvalidOperationException>(() => flow.BallReleased());
+        }
+
+        [Test]
+        public void ATenthFrameStrike_GivesTwoMoreThrowsBeforeTheGameIsOver()
+        {
+            var flow = new GameFlow();
+            flow.ConfirmSelection();
+            for (var i = 0; i < 18; i++) Throw(flow, 0);
+
+            Throw(flow, 10);
+            Throw(flow, 10);
+            Assert.That(flow.Phase, Is.EqualTo(GamePhase.Ready));
+            Throw(flow, 10);
+
+            Assert.That(flow.Phase, Is.EqualTo(GamePhase.GameOver));
+            Assert.That(flow.Session.Score, Is.EqualTo(30));
+        }
+
+        [Test]
+        public void Restart_FromGameOver_StartsOver()
+        {
+            var flow = new GameFlow();
+            flow.ConfirmSelection();
+            for (var i = 0; i < 20; i++) Throw(flow, 0);
+
+            flow.Restart();
+
+            Assert.That(flow.Phase, Is.EqualTo(GamePhase.SelectingLevel));
+            Assert.That(flow.Session.IsComplete, Is.False);
+            Assert.That(flow.Session.PinsStanding, Is.EqualTo(10));
+        }
+
         [Test]
         public void Restart_ClearsRecord_AndReturnsToSelection_WithLevelSelectableAgain()
         {

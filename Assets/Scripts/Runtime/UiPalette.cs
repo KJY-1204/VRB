@@ -21,8 +21,13 @@ namespace VRB
         public static readonly Color Amber = new Color(1f, 0.82f, 0.30f, 1f);
         public static readonly Color Strike = new Color(1f, 0.38f, 0.66f, 1f);
 
-        /// <summary>Amber for ordinary messages, hot pink when the last throw was a strike.</summary>
-        public static Color StatusColor(GamePhase phase, int lastPins) =>
-            phase == GamePhase.ShowingResult && lastPins == GameSession.PinCount ? Strike : Amber;
+        /// <summary>Amber for ordinary messages, hot pink for a strike and cyan for a spare.</summary>
+        public static Color StatusColor(GamePhase phase, GameSession session)
+        {
+            if (phase != GamePhase.ShowingResult) return Amber;
+
+            var mark = session.Card.LastMark;
+            return mark == "X" ? Strike : mark == "/" ? Accent : Amber;
+        }
     }
 }

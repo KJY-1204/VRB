@@ -26,6 +26,18 @@ namespace VRB
         public bool LastJudgementTimedOut => m_Tracker.TimedOut;
         public int PinCount => m_Pins.Length;
 
+        /// <summary>Pins still on the deck: ten on a fresh rack, fewer for the second ball of a frame.</summary>
+        public int ActiveCount
+        {
+            get
+            {
+                var count = 0;
+                foreach (var pin in m_Pins)
+                    if (pin.gameObject.activeSelf) count++;
+                return count;
+            }
+        }
+
         void Awake()
         {
             m_Pins = GetComponentsInChildren<Pin>();
@@ -46,24 +58,50 @@ namespace VRB
             m_Judging = true;
         }
 
+        /// <summary>A fresh rack: every pin back on its spot, including the ones that were taken off the deck.</summary>
         public void ResetAll()
         {
             m_Judging = false;
-            foreach (var pin in m_Pins) pin.ResetToHome();
+            foreach (var pin in m_Pins)
+            {
+                pin.gameObject.SetActive(true);
+                pin.ResetToHome();
+            }
         }
 
+        /// <summary>
+        /// What the pinsetter does between the two balls of a frame: sweeps away the fallen pins and sets the ones still
+        /// standing back on their spots, upright.
+        /// </summary>
+        public void ClearFallenAndRespot()
+        {
+            m_Judging = false;
+            foreach (var pin in m_Pins)
+            {
+                if (!pin.gameObject.activeSelf) continue;
+
+                if (IsFallen(pin)) pin.gameObject.SetActive(false);
+                else pin.ResetToHome();
+            }
+        }
+
+        /// <summary>Fallen pins among those still on the deck (pins already swept away do not count again).</summary>
         public int CountFallen()
         {
             var fallen = 0;
             foreach (var pin in m_Pins)
-                if (PinJudge.IsFallen(pin.TiltDegrees, pin.Displacement, pin.InPit, m_Settings)) fallen++;
+                if (pin.gameObject.activeSelf && IsFallen(pin)) fallen++;
             return fallen;
         }
+
+        bool IsFallen(Pin pin) => PinJudge.IsFallen(pin.TiltDegrees, pin.Displacement, pin.InPit, m_Settings);
 
         public bool AllPinsAtRest()
         {
             foreach (var pin in m_Pins)
             {
+                if (!pin.gameObject.activeSelf) continue;
+
                 // A pin in the pit already counts as fallen, so its motion no longer matters.
                 if (pin.IsSleeping || pin.InPit) continue;
                 if (!PinJudge.IsAtRest(pin.LinearSpeed, pin.AngularSpeed, m_Settings)) return false;

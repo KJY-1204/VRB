@@ -130,6 +130,71 @@ namespace VRB.Tests
         }
 
         [UnityTest]
+        public IEnumerator BetweenBalls_FallenPinsAreSweptAway_AndStandingOnesAreSetBackUp()
+        {
+            yield return new WaitForSeconds(0.5f);
+            for (var i = 0; i < 3; i++)
+            {
+                var body = m_Pins[i].GetComponent<Rigidbody>();
+                body.rotation = Quaternion.Euler(0f, 0f, 90f);
+                body.position += Vector3.up * 0.06f;
+            }
+            // One standing pin got nudged and leans, but is still standing.
+            var leaning = m_Pins[6].GetComponent<Rigidbody>();
+            leaning.rotation = Quaternion.Euler(0f, 0f, 12f);
+            yield return new WaitForFixedUpdate();
+            Assert.That(m_Rack.CountFallen(), Is.EqualTo(3));
+
+            m_Rack.ClearFallenAndRespot();
+            yield return new WaitForSeconds(0.5f);
+
+            Assert.That(m_Rack.ActiveCount, Is.EqualTo(7), "The three fallen pins are off the deck.");
+            for (var i = 0; i < 3; i++) Assert.That(m_Pins[i].gameObject.activeSelf, Is.False, m_Pins[i].name);
+            Assert.That(m_Rack.CountFallen(), Is.EqualTo(0), "Swept-away pins are not counted again.");
+            for (var i = 3; i < m_Pins.Length; i++)
+            {
+                Assert.That(m_Pins[i].TiltDegrees, Is.LessThan(1f), m_Pins[i].name + " stands up straight again.");
+                Assert.That(m_Pins[i].Displacement, Is.LessThan(0.01f), m_Pins[i].name + " is back on its spot.");
+            }
+
+            m_Rack.ResetAll();
+            yield return new WaitForSeconds(0.5f);
+            Assert.That(m_Rack.ActiveCount, Is.EqualTo(10), "A fresh rack brings every pin back.");
+        }
+
+        [UnityTest]
+        public IEnumerator AfterSweeping_OnlyTheStandingPinsAreJudged()
+        {
+            yield return new WaitForSeconds(0.5f);
+            for (var i = 0; i < 4; i++)
+            {
+                var body = m_Pins[i].GetComponent<Rigidbody>();
+                body.rotation = Quaternion.Euler(0f, 0f, 90f);
+                body.position += Vector3.up * 0.06f;
+            }
+            yield return new WaitForFixedUpdate();
+            m_Rack.ClearFallenAndRespot();
+            yield return new WaitForSeconds(0.3f);
+
+            var judged = -1;
+            m_Rack.Judged += count => judged = count;
+            var knocked = m_Pins[8].GetComponent<Rigidbody>();
+            knocked.rotation = Quaternion.Euler(0f, 0f, 90f);
+            knocked.position += Vector3.up * 0.06f;
+            m_Rack.BeginJudging();
+            var waited = 0f;
+            while (judged < 0 && waited < 15f)
+            {
+                waited += Time.deltaTime;
+                yield return null;
+            }
+
+            // The laid pin may take a neighbour down with it, so allow a little more than one; what must not happen is the
+            // four swept-away pins being counted again (that would give five or more).
+            Assert.That(judged, Is.InRange(1, 3), "Only pins that fell on this ball count, not the four from before.");
+        }
+
+        [UnityTest]
         public IEnumerator PinsThatNeverStop_AreJudgedOnceAfterMaxWait()
         {
             m_Rack.SetSettings(new PinJudgeSettings { maxWaitSeconds = 2f, restDuration = 1.5f });

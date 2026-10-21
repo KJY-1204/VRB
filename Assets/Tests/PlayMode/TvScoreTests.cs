@@ -36,7 +36,7 @@ namespace VRB.Tests
         public IEnumerator Tv_ShowsTheTotalAndResult_AfterAThrow()
         {
             m_Game.Flow.ConfirmSelection();
-            Assert.That(m_Tv.StatusText, Is.EqualTo("Grab the ball and throw!"));
+            Assert.That(m_Tv.StatusText, Is.EqualTo("Frame 1 - Ball 1"));
 
             m_Game.Flow.BallReleased();
             m_Game.Flow.ThrowReachedPins();
