@@ -53,10 +53,10 @@ namespace VRB
             }
         }
 
-        public bool IsLocalPlayer => IsOwner;
+        public new bool IsLocalPlayer => IsOwner;
 
         /// <summary>The player object of this device, or null when not in a network game.</summary>
-        public static NetPlayer Local => All.FirstOrDefault(p => p != null && p.IsSpawned && p.IsLocalPlayer);
+        public static NetPlayer Local { get; private set; }
 
         /// <summary>The latest picture of this player's lane (pins and ball), as received from their device.</summary>
         public LaneSnapshot Snapshot { get; } = new LaneSnapshot();
@@ -129,6 +129,7 @@ namespace VRB
             m_Lane.OnValueChanged += OnAnyChange;
             m_Throws.OnListChanged += OnListChange;
             All.Add(this);
+            if (IsOwner) Local = this;
 
             if (IsServer) m_Lane.Value = FreeLane();
 
@@ -142,6 +143,7 @@ namespace VRB
             m_Lane.OnValueChanged -= OnAnyChange;
             m_Throws.OnListChanged -= OnListChange;
             All.Remove(this);
+            if (Local == this) Local = null;
             Changed?.Invoke();
         }
 
