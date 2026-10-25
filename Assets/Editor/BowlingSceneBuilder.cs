@@ -1267,6 +1267,33 @@ namespace VRB.EditorTools
                 visor.GetComponent<MeshRenderer>().sharedMaterial =
                     GetOrCreateMaterial("AvatarVisor", new Color(0.08f, 0.09f, 0.12f), 0.8f);
 
+                // Torso, arms and legs hang off the head and hands; the name floats above the head.
+                var bodyRoot = new GameObject("Body").transform;
+                bodyRoot.SetParent(laneObject.transform, false);
+                var limbMaterial = GetOrCreateMaterial("AvatarBody", new Color(0.35f, 0.5f, 0.75f), 0.3f);
+                var torso = MakeBodyPart(bodyRoot, "Torso", PrimitiveType.Cylinder, limbMaterial);
+                var leftArm = MakeBodyPart(bodyRoot, "LeftArm", PrimitiveType.Cylinder, limbMaterial);
+                var rightArm = MakeBodyPart(bodyRoot, "RightArm", PrimitiveType.Cylinder, limbMaterial);
+                var legs = MakeBodyPart(bodyRoot, "Legs", PrimitiveType.Cube, limbMaterial);
+
+                var tag = new GameObject("NameTag");
+                tag.transform.SetParent(bodyRoot, false);
+                var tagText = tag.AddComponent<TextMeshPro>();
+                tagText.fontSize = 1.4f;
+                tagText.alignment = TextAlignmentOptions.Center;
+                tagText.color = Color.white;
+                tagText.fontStyle = FontStyles.Bold;
+                tagText.rectTransform.sizeDelta = new Vector2(2f, 0.4f);
+
+                fields.FindProperty("m_BodyRoot").objectReferenceValue = bodyRoot;
+                fields.FindProperty("m_Torso").objectReferenceValue = torso;
+                fields.FindProperty("m_Legs").objectReferenceValue = legs;
+                fields.FindProperty("m_LeftArm").objectReferenceValue = leftArm;
+                fields.FindProperty("m_RightArm").objectReferenceValue = rightArm;
+                fields.FindProperty("m_NameTag").objectReferenceValue = tag.transform;
+                fields.FindProperty("m_NameText").objectReferenceValue = tagText;
+                bodyRoot.gameObject.SetActive(false);
+
                 var partArray = fields.FindProperty("m_AvatarParts");
                 partArray.arraySize = parts.Length;
                 for (var p = 0; p < parts.Length; p++) partArray.GetArrayElementAtIndex(p).objectReferenceValue = parts[p];
@@ -1301,6 +1328,16 @@ namespace VRB.EditorTools
             avatarFields.FindProperty("m_LeftHand").objectReferenceValue = rig.transform.Find("Camera Offset/Left Controller");
             avatarFields.FindProperty("m_RightHand").objectReferenceValue = rig.transform.Find("Camera Offset/Right Controller");
             avatarFields.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        static Transform MakeBodyPart(Transform parent, string name, PrimitiveType shape, Material material)
+        {
+            var part = GameObject.CreatePrimitive(shape);
+            part.name = name;
+            Object.DestroyImmediate(part.GetComponent<Collider>());
+            part.transform.SetParent(parent, false);
+            part.GetComponent<MeshRenderer>().sharedMaterial = material;
+            return part.transform;
         }
 
         static Transform MakeAvatarPart(Transform parent, string name, float diameter, Material material)

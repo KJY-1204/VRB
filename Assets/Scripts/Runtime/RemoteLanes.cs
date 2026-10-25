@@ -45,6 +45,7 @@ namespace VRB
                 m_Lanes.SetRemote(lane, show);
                 m_RemoteLanes[lane].SetSideways(m_Lanes.SidewaysFromPlayed(lane));
                 m_RemoteLanes[lane].Show(show);
+                if (show) m_RemoteLanes[lane].SetName(player.PlayerName);
                 if (show && player.SnapshotTime >= 0f) m_RemoteLanes[lane].SetTarget(player.Snapshot);
                 if (show && player.PoseTime >= 0f) m_RemoteLanes[lane].SetPose(player.Pose);
             }

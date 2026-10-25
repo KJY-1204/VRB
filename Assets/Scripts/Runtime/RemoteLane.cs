@@ -18,6 +18,16 @@ namespace VRB
         [Tooltip("Head, left hand and right hand of the player on this lane (see AvatarSnapshot).")]
         [SerializeField] Transform[] m_AvatarParts = new Transform[AvatarSnapshot.PartCount];
 
+        [Header("Body (all children of the body root, which is switched with the avatar)")]
+        [SerializeField] Transform m_BodyRoot;
+        [SerializeField] Transform m_Torso;
+        [SerializeField] Transform m_Legs;
+        [SerializeField] Transform m_LeftArm;
+        [SerializeField] Transform m_RightArm;
+        [SerializeField] Transform m_NameTag;
+        [SerializeField] TMPro.TMP_Text m_NameText;
+        [SerializeField] float m_NameHeight = 0.3f;
+
         readonly LaneSnapshot m_Target = new LaneSnapshot();
         readonly AvatarSnapshot m_PoseTarget = new AvatarSnapshot();
         bool m_HasTarget;
@@ -27,6 +37,20 @@ namespace VRB
         public Transform AvatarPart(int part) => m_AvatarParts[part];
 
         public bool IsAvatarShown => m_HasPose;
+
+        /// <summary>The body parts that are drawn from the head and hands, for tests.</summary>
+        public Transform Torso => m_Torso;
+        public Transform Legs => m_Legs;
+        public Transform LeftArm => m_LeftArm;
+        public Transform RightArm => m_RightArm;
+        public Transform NameTag => m_NameTag;
+        public string DisplayedName => m_NameText != null ? m_NameText.text : string.Empty;
+
+        /// <summary>The name floating above the player's head.</summary>
+        public void SetName(string playerName)
+        {
+            if (m_NameText != null && m_NameText.text != playerName) m_NameText.text = playerName ?? string.Empty;
+        }
 
         /// <summary>Follow this pose of the player's head and hands. The first one (or <paramref name="jump"/>) is taken at once.</summary>
         public void SetPose(AvatarSnapshot pose, bool jump = false)
@@ -39,12 +63,50 @@ namespace VRB
                 m_AvatarParts[i].gameObject.SetActive(true);
                 if (jump || first) m_AvatarParts[i].SetLocalPositionAndRotation(m_PoseTarget.Positions[i], m_PoseTarget.Rotations[i]);
             }
+
+            if (m_BodyRoot != null) m_BodyRoot.gameObject.SetActive(true);
+            UpdateBody();
         }
 
         void HideAvatar()
         {
             m_HasPose = false;
             foreach (var part in m_AvatarParts) part.gameObject.SetActive(false);
+            if (m_BodyRoot != null) m_BodyRoot.gameObject.SetActive(false);
+        }
+
+        // Torso, arms, legs and name tag follow the (already smoothed) head and hands.
+        void UpdateBody()
+        {
+            if (m_BodyRoot == null) return;
+
+            var head = m_AvatarParts[AvatarSnapshot.Head];
+            var frame = AvatarBody.Solve(head.localPosition, head.localRotation);
+
+            Stretch(m_Torso, frame.Neck, frame.Hip, 0.30f);
+            Stretch(m_LeftArm, frame.LeftShoulder, m_AvatarParts[AvatarSnapshot.LeftHand].localPosition, 0.07f);
+            Stretch(m_RightArm, frame.RightShoulder, m_AvatarParts[AvatarSnapshot.RightHand].localPosition, 0.07f);
+            m_Legs.SetLocalPositionAndRotation(frame.LegsCenter, frame.LegsRotation);
+            m_Legs.localScale = frame.LegsSize;
+
+            // The name always faces whoever is looking.
+            var tagPosition = head.localPosition + Vector3.up * m_NameHeight;
+            var viewer = Camera.main;
+            var away = viewer != null ? m_BodyRoot.InverseTransformDirection(tagPosition - viewer.transform.position) : Vector3.forward;
+            m_NameTag.localPosition = tagPosition;
+            if (away.sqrMagnitude > 1e-4f) m_NameTag.localRotation = Quaternion.LookRotation(away, Vector3.up);
+        }
+
+        // A unit cylinder (2 m tall, 1 m wide) laid between two points.
+        static void Stretch(Transform limb, Vector3 from, Vector3 to, float thickness)
+        {
+            var along = to - from;
+            var length = along.magnitude;
+            if (length < 1e-3f) return;
+
+            limb.localPosition = (from + to) / 2f;
+            limb.localRotation = Quaternion.FromToRotation(Vector3.up, along / length);
+            limb.localScale = new Vector3(thickness, length / 2f, thickness);
         }
 
         public bool IsShown => gameObject.activeSelf;
@@ -95,6 +157,8 @@ namespace VRB
                         Vector3.Lerp(part.localPosition, m_PoseTarget.Positions[i], blend),
                         Quaternion.Slerp(part.localRotation, m_PoseTarget.Rotations[i], blend));
                 }
+
+                UpdateBody();
             }
 
             if (!m_HasTarget) return;

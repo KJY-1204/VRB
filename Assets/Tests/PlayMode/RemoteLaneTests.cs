@@ -4,6 +4,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.TestTools.Utils;
 
 namespace VRB.Tests
 {
@@ -183,6 +184,73 @@ namespace VRB.Tests
             Assert.That(pose.Positions[AvatarSnapshot.Head].y, Is.InRange(0.5f, 2.5f), "at head height");
             Assert.That(pose.Positions[AvatarSnapshot.LeftHand].z, Is.EqualTo(-1.6f).Within(1f));
             Assert.That(pose.Positions[AvatarSnapshot.RightHand].z, Is.EqualTo(-1.6f).Within(1f));
+        }
+
+        [Test]
+        public void AStandingPlayer_HasLegsDownToTheFloor()
+        {
+            var frame = AvatarBody.Solve(new Vector3(0f, 1.6f, -1.6f), Quaternion.identity);
+
+            Assert.That(frame.Seated, Is.False);
+            Assert.That(frame.Hip.y, Is.LessThan(frame.Neck.y));
+            Assert.That(frame.LegsSize.y, Is.EqualTo(frame.Hip.y).Within(0.001f));
+            Assert.That(frame.LegsCenter.y, Is.EqualTo(frame.Hip.y / 2f).Within(0.001f));
+        }
+
+        [Test]
+        public void ASittingPlayer_HasTheirLegsOutInFront()
+        {
+            var frame = AvatarBody.Solve(new Vector3(0f, 1.05f, -1.6f), Quaternion.identity);
+
+            Assert.That(frame.Seated, Is.True);
+            Assert.That(frame.LegsSize.y, Is.LessThan(0.2f), "thighs lie flat");
+            Assert.That(frame.LegsCenter.z, Is.GreaterThan(frame.Hip.z + 0.1f), "and reach forward (+Z is down the lane)");
+        }
+
+        [Test]
+        public void TheBody_TurnsWithTheHeadSideways_ButNotWithNodding()
+        {
+            var turned = AvatarBody.Solve(new Vector3(0f, 1.6f, 0f), Quaternion.Euler(0f, 90f, 0f));
+            Assert.That(turned.RightShoulder.z, Is.LessThan(turned.LeftShoulder.z - 0.3f), "facing +X puts the right shoulder at -Z");
+
+            var nodding = AvatarBody.Solve(new Vector3(0f, 1.6f, 0f), Quaternion.Euler(60f, 0f, 0f));
+            var level = AvatarBody.Solve(new Vector3(0f, 1.6f, 0f), Quaternion.identity);
+            Assert.That(nodding.Hip, Is.EqualTo(level.Hip).Using(new Vector3EqualityComparer(0.001f)));
+        }
+
+        [UnityTest]
+        public IEnumerator TheBody_ReachesFromTheShouldersToTheHands()
+        {
+            m_Remote.Apply(2, Sample(0f));
+            var pose = Pose(0f);
+            pose.Rotations[AvatarSnapshot.Head] = Quaternion.identity;
+            pose.Positions[AvatarSnapshot.RightHand] = new Vector3(0.6f, 1.0f, -1.2f);
+            m_Remote.ApplyPose(2, pose);
+            yield return null;
+
+            var lane = m_Remote.Lane(2);
+            Assert.That(lane.Torso.gameObject.activeInHierarchy, Is.True);
+            var arm = lane.RightArm;
+            var hand = lane.AvatarPart(AvatarSnapshot.RightHand).localPosition;
+            var armTip = arm.localPosition + arm.localRotation * Vector3.up * arm.localScale.y;
+            Assert.That(Vector3.Distance(armTip, hand), Is.LessThan(0.02f), "one end of the arm is at the hand");
+        }
+
+        [UnityTest]
+        public IEnumerator TheName_IsShownAboveTheHead_AndGoesWithTheAvatar()
+        {
+            m_Remote.Apply(1, Sample(0f));
+            m_Remote.Lane(1).SetName("Mina");
+            m_Remote.ApplyPose(1, Pose(0f));
+            yield return null;
+
+            var lane = m_Remote.Lane(1);
+            Assert.That(lane.DisplayedName, Is.EqualTo("Mina"));
+            Assert.That(lane.NameTag.localPosition.y, Is.GreaterThan(lane.AvatarPart(AvatarSnapshot.Head).localPosition.y + 0.2f));
+
+            lane.Show(false);
+            lane.Show(true);
+            Assert.That(lane.Torso.gameObject.activeInHierarchy, Is.False, "no body without a pose");
         }
 
         [Test]
