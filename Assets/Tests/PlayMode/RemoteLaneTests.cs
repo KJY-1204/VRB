@@ -186,6 +186,49 @@ namespace VRB.Tests
             Assert.That(pose.Positions[AvatarSnapshot.RightHand].z, Is.EqualTo(-1.6f).Within(1f));
         }
 
+        [UnityTest]
+        public IEnumerator AVoiceSentToALane_IsPlayedFromTheirHead_AndTheNameLightsUp()
+        {
+            m_Remote.Apply(1, Sample(0f));
+            m_Remote.ApplyPose(1, Pose(0f));
+            yield return null;
+            var lane = m_Remote.Lane(1);
+            Assert.That(lane.Voice.IsSpeaking, Is.False);
+
+            var tone = new float[VRB.Core.VoiceCodec.ChunkSamples * 4];
+            for (var i = 0; i < tone.Length; i++) tone[i] = 0.4f * Mathf.Sin(i * 0.2f);
+            for (var chunk = 0; chunk < 4; chunk++)
+            {
+                var piece = new float[VRB.Core.VoiceCodec.ChunkSamples];
+                System.Array.Copy(tone, chunk * piece.Length, piece, 0, piece.Length);
+                lane.Voice.Push(VRB.Core.VoiceCodec.Encode(piece, piece.Length));
+            }
+
+            yield return null;
+            Assert.That(lane.Voice.IsSpeaking, Is.True);
+            Assert.That(lane.Voice.Buffered, Is.GreaterThan(0));
+            Assert.That(lane.Voice.transform.localPosition, Is.EqualTo(lane.AvatarPart(AvatarSnapshot.Head).localPosition).Using(new Vector3EqualityComparer(0.01f)));
+
+            var output = new float[512];
+            lane.Voice.Fill(output);
+            Assert.That(output, Has.Some.Not.EqualTo(0f), "something comes out once enough has arrived");
+        }
+
+        [UnityTest]
+        public IEnumerator ABrokenVoicePacket_IsIgnored()
+        {
+            m_Remote.Apply(1, Sample(0f));
+            var voice = m_Remote.Lane(1).Voice;
+
+            voice.Push(null);
+            voice.Push(new byte[0]);
+            voice.Push(new byte[100000]);
+            yield return null;
+
+            Assert.That(voice.Buffered, Is.EqualTo(0));
+            Assert.That(voice.IsSpeaking, Is.False);
+        }
+
         [Test]
         public void AStandingPlayer_HasLegsDownToTheFloor()
         {

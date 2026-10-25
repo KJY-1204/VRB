@@ -1285,6 +1285,18 @@ namespace VRB.EditorTools
                 tagText.fontStyle = FontStyles.Bold;
                 tagText.rectTransform.sizeDelta = new Vector2(2f, 0.4f);
 
+                // The voice is heard from the head, so it follows the head; it lives outside the body so it is always on.
+                var voiceObject = new GameObject("Voice");
+                voiceObject.transform.SetParent(laneObject.transform, false);
+                voiceObject.transform.localPosition = new Vector3(0f, 1.5f, -1.6f);
+                var voiceSource = voiceObject.AddComponent<AudioSource>();
+                voiceSource.playOnAwake = false;
+                voiceSource.spatialBlend = 1f;
+                voiceSource.rolloffMode = AudioRolloffMode.Linear;
+                voiceSource.minDistance = 1f;
+                voiceSource.maxDistance = 12f;
+                fields.FindProperty("m_Voice").objectReferenceValue = voiceObject.AddComponent<RemoteVoice>();
+
                 fields.FindProperty("m_BodyRoot").objectReferenceValue = bodyRoot;
                 fields.FindProperty("m_Torso").objectReferenceValue = torso;
                 fields.FindProperty("m_Legs").objectReferenceValue = legs;
@@ -1317,6 +1329,8 @@ namespace VRB.EditorTools
             broadcasterFields.FindProperty("m_Rack").objectReferenceValue = GameObject.Find("Pins").GetComponent<PinRack>();
             broadcasterFields.FindProperty("m_Ball").objectReferenceValue = GameObject.Find("Ball").transform;
             broadcasterFields.ApplyModifiedPropertiesWithoutUndo();
+
+            bridge.gameObject.AddComponent<VoiceSender>();
 
             var rig = GameObject.Find("XR Origin (XR Rig)");
             if (rig == null) return;

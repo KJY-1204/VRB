@@ -27,6 +27,10 @@ namespace VRB
         [SerializeField] Transform m_NameTag;
         [SerializeField] TMPro.TMP_Text m_NameText;
         [SerializeField] float m_NameHeight = 0.3f;
+        [Tooltip("Where the player's voice comes from; follows the head.")]
+        [SerializeField] RemoteVoice m_Voice;
+        [SerializeField] Color m_NameColor = Color.white;
+        [SerializeField] Color m_SpeakingColor = new Color(0.45f, 1f, 0.55f);
 
         readonly LaneSnapshot m_Target = new LaneSnapshot();
         readonly AvatarSnapshot m_PoseTarget = new AvatarSnapshot();
@@ -44,6 +48,8 @@ namespace VRB
         public Transform LeftArm => m_LeftArm;
         public Transform RightArm => m_RightArm;
         public Transform NameTag => m_NameTag;
+        public RemoteVoice Voice => m_Voice;
+
         public string DisplayedName => m_NameText != null ? m_NameText.text : string.Empty;
 
         /// <summary>The name floating above the player's head.</summary>
@@ -94,6 +100,12 @@ namespace VRB
             var viewer = Camera.main;
             var away = viewer != null ? m_BodyRoot.InverseTransformDirection(tagPosition - viewer.transform.position) : Vector3.forward;
             m_NameTag.localPosition = tagPosition;
+            if (m_Voice != null)
+            {
+                m_Voice.transform.localPosition = head.localPosition;
+                if (m_NameText != null) m_NameText.color = m_Voice.IsSpeaking ? m_SpeakingColor : m_NameColor;
+            }
+
             if (away.sqrMagnitude > 1e-4f) m_NameTag.localRotation = Quaternion.LookRotation(away, Vector3.up);
         }
 

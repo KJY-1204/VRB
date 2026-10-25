@@ -103,6 +103,20 @@ namespace VRB
             PoseReceived?.Invoke(this);
         }
 
+        /// <summary>Raised when a chunk of another player's coded voice has arrived.</summary>
+        public static event Action<NetPlayer, byte[]> VoiceReceived;
+
+        /// <summary>Send a chunk of coded speech to the other players (the owner only).</summary>
+        public void SendVoice(byte[] encoded)
+        {
+            if (!IsOwner || !IsSpawned) return;
+            VoiceRpc(encoded);
+        }
+
+        // Late or lost speech is of no use, so it goes unreliably like the pictures.
+        [Rpc(SendTo.NotOwner, Delivery = RpcDelivery.Unreliable)]
+        void VoiceRpc(byte[] encoded) => VoiceReceived?.Invoke(this, encoded);
+
         void Awake()
         {
             // A NetworkList has to exist before the object spawns.

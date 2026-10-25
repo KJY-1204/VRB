@@ -205,6 +205,38 @@ namespace VRB.Tests
         }
 
         [UnityTest]
+        public IEnumerator Speech_ReachesTheOtherDevice_ButNotTheSpeaker()
+        {
+            yield return HostAndJoin();
+            var clientPlayer = PlayerOn(m_Client, m_Client.LocalClientId);
+            var onHost = PlayerOn(m_Host, m_Client.LocalClientId);
+
+            byte[] heard = null;
+            NetPlayer heardFrom = null;
+            var heardOnSpeaker = false;
+            System.Action<NetPlayer, byte[]> listen = (player, bytes) =>
+            {
+                if (player == onHost) { heard = bytes; heardFrom = player; }
+                if (player == clientPlayer) heardOnSpeaker = true;
+            };
+            NetPlayer.VoiceReceived += listen;
+
+            var chunk = new byte[VRB.Core.VoiceCodec.ChunkSamples];
+            for (var i = 0; i < chunk.Length; i++) chunk[i] = (byte)(i % 251);
+            for (var attempt = 0; attempt < 20 && heard == null; attempt++)
+            {
+                clientPlayer.SendVoice(chunk);
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            NetPlayer.VoiceReceived -= listen;
+            Assert.That(heard, Is.Not.Null, "The speech should arrive.");
+            Assert.That(heard, Is.EqualTo(chunk));
+            Assert.That(heardFrom, Is.SameAs(onHost));
+            Assert.That(heardOnSpeaker, Is.False, "Nobody hears their own voice back.");
+        }
+
+        [UnityTest]
         public IEnumerator ANewGame_EmptiesTheThrowsOnTheOtherDevice()
         {
             yield return HostAndJoin();

@@ -19,6 +19,7 @@ namespace VRB
             NetPlayer.Changed += Refresh;
             NetPlayer.SnapshotReceived += OnSnapshot;
             NetPlayer.PoseReceived += OnPose;
+            NetPlayer.VoiceReceived += OnVoice;
             m_Lanes.LaneChanged += OnLaneChanged;
         }
 
@@ -27,6 +28,7 @@ namespace VRB
             NetPlayer.Changed -= Refresh;
             NetPlayer.SnapshotReceived -= OnSnapshot;
             NetPlayer.PoseReceived -= OnPose;
+            NetPlayer.VoiceReceived -= OnVoice;
             m_Lanes.LaneChanged -= OnLaneChanged;
         }
 
@@ -49,6 +51,15 @@ namespace VRB
                 if (show && player.SnapshotTime >= 0f) m_RemoteLanes[lane].SetTarget(player.Snapshot);
                 if (show && player.PoseTime >= 0f) m_RemoteLanes[lane].SetPose(player.Pose);
             }
+        }
+
+        // A voice is heard from the lane of the one speaking.
+        void OnVoice(NetPlayer player, byte[] encoded)
+        {
+            var lane = player.Lane;
+            if (lane < 0 || lane >= m_RemoteLanes.Length || !m_RemoteLanes[lane].IsShown) return;
+
+            m_RemoteLanes[lane].Voice.Push(encoded);
         }
 
         void OnPose(NetPlayer player)
