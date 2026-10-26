@@ -73,5 +73,7 @@ openspec/            변경 계획(OpenSpec): proposal, specs, design, tasks
   [Creative Commons Attribution 4.0](http://creativecommons.org/licenses/by/4.0/) 라이선스.
   이 프로젝트에서는 홀 전체(레인 4개, 천장, 테이블과 의자, TV 등)를 배경으로 쓰고, 볼링핀·볼링공 메시는 실제 치수에 맞게 크기를 조정해 게임용으로 씁니다.
   홀은 레인 방향으로 늘이고 일부 메시를 복사해 편집했습니다. (원본 라이선스 문구: `Assets/VRB/bowling-club/license.txt`)
+  게임 안에서도 메인 화면의 CREDITS에서 볼 수 있습니다.
+- 효과음 3개(`Assets/VRB/*.wav`)는 출처 표기가 필요 없음을 확인했습니다.
 - `Assets/Samples`와 `Assets/VRTemplateAssets`는 Unity 패키지(XR Interaction Toolkit, XR Hands, VR 템플릿)에서 가져온 샘플입니다.
 - 소스 코드의 라이선스는 아직 지정하지 않았습니다.

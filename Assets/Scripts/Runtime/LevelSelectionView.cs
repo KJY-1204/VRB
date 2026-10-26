@@ -17,12 +17,14 @@ namespace VRB
         [SerializeField] Button[] m_PlayerButtons = new Button[0];  // index = player count - 1
         [SerializeField] Button m_StartButton;
         [SerializeField] Button m_NetworkButton;
+        [SerializeField] Button m_MenuButton;
         [SerializeField] TMP_Text m_DescriptionText;
 
         public event Action<ThrowAssistLevel> LevelPicked;
         public event Action<int> LanePicked;
         public event Action<int> PlayersPicked;
         public event Action NetworkPressed;
+        public event Action MenuPressed;
         public event Action StartPressed;
 
         public ThrowAssistLevel Selected { get; private set; } = ThrowAssist.Default;
@@ -55,6 +57,7 @@ namespace VRB
 
             m_StartButton.onClick.AddListener(() => StartPressed?.Invoke());
             if (m_NetworkButton != null) m_NetworkButton.onClick.AddListener(() => NetworkPressed?.Invoke());
+            if (m_MenuButton != null) m_MenuButton.onClick.AddListener(() => MenuPressed?.Invoke());
             Refresh();
         }
 

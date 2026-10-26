@@ -828,9 +828,11 @@ namespace VRB.EditorTools
             start.targetGraphic.color = UiPalette.Go;
             start.transform.Find("Ring").GetComponent<Image>().color = new Color(0.55f, 1f, 0.75f, 0.9f);
             var online = MakeButton(root, "NetworkButton", "ONLINE", new Vector2(-370f, -350f), new Vector2(210f, 90f), 36f);
+            var menu = MakeButton(root, "MenuButton", "MENU", new Vector2(370f, -350f), new Vector2(210f, 90f), 36f);
 
             var so = new SerializedObject(view);
             so.FindProperty("m_NetworkButton").objectReferenceValue = online;
+            so.FindProperty("m_MenuButton").objectReferenceValue = menu;
             var array = so.FindProperty("m_LevelButtons");
             array.arraySize = 4;
             for (var i = 0; i < 4; i++) array.GetArrayElementAtIndex(i).objectReferenceValue = buttons[i];
@@ -976,7 +978,7 @@ namespace VRB.EditorTools
             SetReference(controller, "m_SelectionView", GameObject.Find("SelectionCanvas").GetComponent<LevelSelectionView>());
             SetReference(controller, "m_Scoreboard", GameObject.Find("ScoreboardCanvas").GetComponent<ScoreboardView>());
             SetReference(controller, "m_Tv", GameObject.Find("TvCanvas").GetComponent<TvScoreView>());
-            SetReference(controller, "m_Lanes", GameObject.Find("Lane").GetComponent<LaneSelector>());
+            SetReference(controller, "m_Lanes", FindRoot("Lane").GetComponent<LaneSelector>());
 
             game.SetActive(true);
             EditorSceneManagerUtility.MarkDirty(game.scene);
@@ -1030,7 +1032,7 @@ namespace VRB.EditorTools
             DestroyIfExists("Seat");
             var rig = GameObject.Find("XR Origin (XR Rig)");
             var hall = GameObject.Find("Hall");
-            var selector = GameObject.Find("Lane")?.GetComponent<LaneSelector>();
+            var selector = FindRoot("Lane")?.GetComponent<LaneSelector>();
             if (rig == null || hall == null || selector == null) return;
 
             foreach (var old in hall.GetComponentsInChildren<SeatSpot>(true).ToArray())
@@ -1174,8 +1176,11 @@ namespace VRB.EditorTools
             DestroyIfExists("NetworkBridge");
             DestroyIfExists("NetworkMenu");
             DestroyIfExists("NetworkMenuCanvas");
+            foreach (var old in Object.FindObjectsByType<TitleView>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                Object.DestroyImmediate(old.gameObject);
+            DestroyIfExists("TitleCanvas");
             var game = GameObject.Find("Game");
-            var lane = GameObject.Find("Lane")?.GetComponent<LaneSelector>();
+            var lane = FindRoot("Lane")?.GetComponent<LaneSelector>();
             if (game == null || lane == null) return;
 
             EnsureFolder("Assets/VRB", "Prefabs");
@@ -1209,7 +1214,8 @@ namespace VRB.EditorTools
             bridgeFields.FindProperty("m_Selection").objectReferenceValue = selection;
             bridgeFields.ApplyModifiedPropertiesWithoutUndo();
 
-            BuildNetworkMenu(session, selection);
+            var networkMenu = BuildNetworkMenu(session, selection);
+            BuildTitle(session, selection, networkMenu);
             BuildRemoteLanes(lane, bridge.transform);
 
             // Sockets need the internet permission on the headset, even for a game on the local network.
@@ -1369,7 +1375,7 @@ namespace VRB.EditorTools
         /// The screen for hosting a game or joining one: three or four panels on a canvas that takes the start screen's
         /// place, and an always-active "NetworkMenu" object that runs them.
         /// </summary>
-        static void BuildNetworkMenu(NetworkSession session, LevelSelectionView selection)
+        static NetworkMenuView BuildNetworkMenu(NetworkSession session, LevelSelectionView selection)
         {
             var canvas = CreateWorldCanvas("NetworkMenuCanvas", new Vector2(1000f, 900f), 0.0015f, new Vector3(0f, 1.4f, 1.0f));
             var root = canvas.transform;
@@ -1467,6 +1473,58 @@ namespace VRB.EditorTools
             Fill("m_LeaveButtons", hostingLeave, connectedLeave);
             Fill("m_KeyButtons", keys);
             so.ApplyModifiedPropertiesWithoutUndo();
+            return menu;
+        }
+
+        /// <summary>
+        /// The screen the game opens on, in the start screen's place: the name, PLAY, ONLINE and CREDITS, with the
+        /// credits (the hall model asks for its maker to be named) on a second panel. An always-active "TitleScreen" object runs it.
+        /// </summary>
+        static void BuildTitle(NetworkSession session, LevelSelectionView selection, NetworkMenuView network)
+        {
+            var canvas = CreateWorldCanvas("TitleCanvas", new Vector2(1000f, 900f), 0.0015f, new Vector3(0f, 1.4f, 1.0f));
+            var root = canvas.transform;
+
+            GameObject Panel(string name)
+            {
+                var panel = new GameObject(name, typeof(RectTransform));
+                panel.transform.SetParent(root, false);
+                return panel;
+            }
+
+            var main = Panel("MainPanel");
+            var logo = MakeText(main.transform, "Title", "VR BOWLING", 100f, new Vector2(0f, 250f), new Vector2(960f, 150f), Color.white, FontStyles.Bold, 10f);
+            logo.textWrappingMode = TextWrappingModes.NoWrap;
+            MakeCard(main.transform, "TitleBar", UiPalette.Accent, new Vector2(0f, 150f), new Vector2(340f, 10f), 5f);
+            MakeText(main.transform, "Tagline", "Throw with your own hands", 44f, new Vector2(0f, 90f), new Vector2(900f, 70f), UiPalette.Muted);
+            var play = MakeButton(main.transform, "PlayButton", "PLAY", new Vector2(0f, -40f), new Vector2(520f, 130f), 68f);
+            play.targetGraphic.color = UiPalette.Go;
+            play.transform.Find("Ring").GetComponent<Image>().color = new Color(0.55f, 1f, 0.75f, 0.9f);
+            var online = MakeButton(main.transform, "OnlineButton", "ONLINE", new Vector2(0f, -190f), new Vector2(520f, 100f), 48f);
+            var credits = MakeButton(main.transform, "CreditsButton", "CREDITS", new Vector2(0f, -310f), new Vector2(520f, 100f), 48f);
+
+            var creditsPanel = Panel("CreditsPanel");
+            MakeText(creditsPanel.transform, "Title", "CREDITS", 76f, new Vector2(0f, 395f), new Vector2(900f, 110f), Color.white, FontStyles.Bold, 8f);
+            MakeCard(creditsPanel.transform, "TitleBar", UiPalette.Accent, new Vector2(0f, 338f), new Vector2(260f, 8f), 4f);
+            var body = MakeText(creditsPanel.transform, "Body", TitleView.Credits, 42f, new Vector2(0f, 20f), new Vector2(920f, 600f), Color.white);
+            body.textWrappingMode = TextWrappingModes.Normal;
+            var back = MakeButton(creditsPanel.transform, "BackButton", "BACK", new Vector2(0f, -340f), new Vector2(360f, 100f), 48f);
+            creditsPanel.SetActive(false);
+
+            var view = new GameObject("TitleScreen").AddComponent<TitleView>();
+            var so = new SerializedObject(view);
+            so.FindProperty("m_Selection").objectReferenceValue = selection;
+            so.FindProperty("m_Network").objectReferenceValue = network;
+            so.FindProperty("m_Session").objectReferenceValue = session;
+            so.FindProperty("m_Canvas").objectReferenceValue = canvas;
+            so.FindProperty("m_MainPanel").objectReferenceValue = main;
+            so.FindProperty("m_CreditsPanel").objectReferenceValue = creditsPanel;
+            so.FindProperty("m_CreditsText").objectReferenceValue = body;
+            so.FindProperty("m_PlayButton").objectReferenceValue = play;
+            so.FindProperty("m_OnlineButton").objectReferenceValue = online;
+            so.FindProperty("m_CreditsButton").objectReferenceValue = credits;
+            so.FindProperty("m_CreditsBackButton").objectReferenceValue = back;
+            so.ApplyModifiedPropertiesWithoutUndo();
         }
 
         // ---------------------------------------------------------------- helpers
@@ -1508,8 +1566,22 @@ namespace VRB.EditorTools
                     StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
         }
 
+        // A top-level object of the scene by name. GameObject.Find also matches nested objects with the same name (the network
+        // menu has a text called "Lane"), so anything that must be the real object looks among the roots first.
+        static GameObject FindRoot(string name)
+        {
+            var root = SceneManager.GetActiveScene().GetRootGameObjects().FirstOrDefault(r => r.name == name);
+            return root != null ? root : GameObject.Find(name);
+        }
+
+        // Screens are hidden while another one is up, and GameObject.Find does not see hidden objects, so the scene's own
+        // top-level objects are searched first (hidden or not); only a name that is not one of them is looked up by Find.
         static void DestroyIfExists(string name)
         {
+            var roots = SceneManager.GetActiveScene().GetRootGameObjects().Where(r => r.name == name).ToArray();
+            foreach (var root in roots) Object.DestroyImmediate(root);
+            if (roots.Length > 0) return;
+
             var existing = GameObject.Find(name);
             if (existing != null) Object.DestroyImmediate(existing);
         }

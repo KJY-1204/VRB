@@ -102,10 +102,14 @@ namespace VRB
             Refresh();
         }
 
+        /// <summary>Raised after the menu has closed and the start screen is back.</summary>
+        public event System.Action Closed;
+
         public void Close()
         {
             m_Canvas.SetActive(false);
             m_Selection.SetSuppressed(false);
+            Closed?.Invoke();
         }
 
         public void PressHost()
